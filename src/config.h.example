@@ -1,0 +1,2 @@
+#pragma once
+#define FINNHUB_API_KEY "your_key_here"
