@@ -4,6 +4,58 @@
 #include <implot.h>
 #include <d3d11.h>
 #include <tchar.h>
+#include <curl/curl.h>
+#include <nlohmann/json.hpp>
+#include <string>
+#include <iostream>
+#include "config.h"
+#include <vector>
+#include <chrono>
+
+static std::vector<float> g_priceHistory;
+static std::vector<float> g_timeAxis;
+static float g_pollIntervalSeconds = 5.0f;
+
+static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
+{
+  ((std::string *)userp)->append((char *)contents, size * nmemb);
+  return size * nmemb;
+}
+
+std::string FetchQuoteRaw(const std::string &symbol)
+{
+  CURL *curl = curl_easy_init();
+  std::string response;
+  if (curl)
+  {
+    std::string url = "https://finnhub.io/api/v1/quote?symbol=" + symbol + "&token=" + FINNHUB_API_KEY;
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    CURLcode res = curl_easy_perform(curl);
+    if (res != CURLE_OK)
+    {
+      std::cerr << "curl error: " << curl_easy_strerror(res) << std::endl;
+    }
+    curl_easy_cleanup(curl);
+  }
+  return response;
+}
+
+float FetchQuotePrice(const std::string &symbol)
+{
+  std::string raw = FetchQuoteRaw(symbol);
+  try
+  {
+    auto j = nlohmann::json::parse(raw);
+    return j["c"].get<float>();
+  }
+  catch (...)
+  {
+    return -1.0f; // signals a fetch/parse failure
+  }
+}
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -77,6 +129,13 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   ImPlot::CreateContext();
   ImGui_ImplWin32_Init(hwnd);
   ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
+  auto lastPoll = std::chrono::steady_clock::now();
+  float price = FetchQuotePrice("AAPL");
+  if (price > 0)
+  {
+    g_priceHistory.push_back(price);
+    g_timeAxis.push_back(0.0f);
+  }
 
   bool done = false;
   while (!done)
@@ -91,18 +150,32 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
     }
     if (done)
       break;
-
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration<float>(now - lastPoll).count() >= g_pollIntervalSeconds)
+    {
+      lastPoll = now;
+      float p = FetchQuotePrice("AAPL");
+      if (p > 0)
+      {
+        g_priceHistory.push_back(p);
+        g_timeAxis.push_back(g_timeAxis.empty() ? 0.0f : g_timeAxis.back() + 1.0f);
+      }
+    }
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
     ImGui::Begin("Stock View");
-    ImGui::Text("If you can see this, ImGui + ImPlot are working.");
-    if (ImPlot::BeginPlot("Placeholder"))
+    if (!g_priceHistory.empty())
     {
-      float xs[5] = {0, 1, 2, 3, 4};
-      float ys[5] = {1, 3, 2, 5, 4};
-      ImPlot::PlotLine("test", xs, ys, 5);
+      ImGui::Text("AAPL last price: %.2f", g_priceHistory.back());
+    }
+    if (ImPlot::BeginPlot("AAPL Price"))
+    {
+      if (!g_priceHistory.empty())
+      {
+        ImPlot::PlotLine("AAPL", g_timeAxis.data(), g_priceHistory.data(), (int)g_priceHistory.size());
+      }
       ImPlot::EndPlot();
     }
     ImGui::End();
