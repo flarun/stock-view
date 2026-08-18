@@ -6,19 +6,21 @@
 #include <tchar.h>
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
+#include <windows.h>
+#include <commdlg.h>
 #include <string>
 #include <iostream>
 #include <vector>
 #include <chrono>
 #include <future>
-#include <windows.h>
-#include <commdlg.h>
+#include <algorithm>
 
 #include "config.h"
 #include "StockModel.h"
 #include "AppView.h"
 #include "HistoryStorage.h"
 
+// --- Windows Native Dialog Helpers ---
 std::string OpenSaveFileDialog(HWND owner)
 {
   OPENFILENAMEA ofn;
@@ -157,6 +159,9 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 // --- Main Application Loop ---
 int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
 {
+  // Ensures crisp rendering and fixes mouse misalignment on high-DPI displays
+  ImGui_ImplWin32_EnableDpiAwareness();
+
   WNDCLASSEX wc = {sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0, 0, hInstance,
                    nullptr, nullptr, nullptr, nullptr, _T("StockView"), nullptr};
   RegisterClassEx(&wc);
@@ -175,15 +180,15 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   ImGui_ImplWin32_Init(hwnd);
   ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
-  // Instantiate Model and View
   StockModel model;
   AppView view;
 
-  auto lastPoll = std::chrono::steady_clock::now();
-  std::future<float> futurePrice = std::async(std::launch::async, FetchQuotePrice, "AAPL");
-  bool isFetching = true;
-  float timeCounter = 0.0f;
+  std::vector<std::string> activeTickers = {"AAPL"};
+  std::unordered_map<std::string, std::future<float>> pendingFetches;
+
   const float pollIntervalSeconds = 5.0f;
+  auto lastPoll = std::chrono::steady_clock::now() - std::chrono::seconds(5);
+  auto appStartTime = std::chrono::steady_clock::now();
 
   bool done = false;
   while (!done)
@@ -200,32 +205,44 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
       break;
 
     auto now = std::chrono::steady_clock::now();
+    float currentAppTime = std::chrono::duration<float>(now - appStartTime).count();
 
-    // 1. Controller logic: Dispatch new request if interval has passed
-    if (!isFetching && std::chrono::duration<float>(now - lastPoll).count() >= pollIntervalSeconds)
+    // 1. Controller logic: Dispatch new network requests
+    if (std::chrono::duration<float>(now - lastPoll).count() >= pollIntervalSeconds)
     {
-      isFetching = true;
-      futurePrice = std::async(std::launch::async, FetchQuotePrice, "AAPL");
+      for (const std::string &ticker : activeTickers)
+      {
+        if (pendingFetches.find(ticker) == pendingFetches.end())
+        {
+          pendingFetches[ticker] = std::async(std::launch::async, FetchQuotePrice, ticker);
+        }
+      }
+      lastPoll = now;
     }
 
-    // 2. Controller logic: Process request if finished
-    if (isFetching && futurePrice.valid() && futurePrice.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+    // 2. Controller logic: Check for completed network requests
+    for (auto it = pendingFetches.begin(); it != pendingFetches.end();)
     {
-      float p = futurePrice.get();
-      if (p > 0)
+      if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
       {
-        model.AddPrice("AAPL", p, timeCounter);
-        timeCounter += pollIntervalSeconds;
+        float p = it->second.get();
+        if (p > 0)
+        {
+          model.AddPrice(it->first, p, currentAppTime);
+        }
+        it = pendingFetches.erase(it);
       }
-      isFetching = false;
-      lastPoll = std::chrono::steady_clock::now();
+      else
+      {
+        ++it;
+      }
     }
 
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    // 3. Render View using the Model's state and capture events
+    // 3. Render the View and handle user inputs
     AppEvents events = view.Render(model.GetStocks());
 
     if (events.quit)
@@ -251,6 +268,20 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
           model.LoadFromHistory(loadedData);
         }
       }
+    }
+    if (!events.addTicker.empty())
+    {
+      if (std::find(activeTickers.begin(), activeTickers.end(), events.addTicker) == activeTickers.end())
+      {
+        activeTickers.push_back(events.addTicker);
+        pendingFetches[events.addTicker] = std::async(std::launch::async, FetchQuotePrice, events.addTicker);
+      }
+    }
+    if (!events.removeTicker.empty())
+    {
+      activeTickers.erase(std::remove(activeTickers.begin(), activeTickers.end(), events.removeTicker), activeTickers.end());
+      pendingFetches.erase(events.removeTicker);
+      model.RemoveStock(events.removeTicker);
     }
 
     ImGui::Render();

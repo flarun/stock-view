@@ -6,19 +6,17 @@
 
 using json = nlohmann::json;
 
-// 1. Tell the library how to convert StockData -> JSON
 inline void to_json(json &j, const StockData &s)
 {
   j = json{{"symbol", s.symbol}, {"prices", s.prices}, {"timeAxis", s.timeAxis}, {"isLive", s.isLive}};
 }
 
-// 2. Tell the library how to convert JSON -> StockData
 inline void from_json(const json &j, StockData &s)
 {
   j.at("symbol").get_to(s.symbol);
   j.at("prices").get_to(s.prices);
   j.at("timeAxis").get_to(s.timeAxis);
-  s.isLive = false; // Always set to false when loading static history
+  s.isLive = false;
 }
 
 class HistoryStorage
@@ -28,11 +26,11 @@ public:
   {
     try
     {
-      json j = data; // nlohmann automatically converts the unordered_map!
+      json j = data;
       std::ofstream file(filepath);
       if (file.is_open())
       {
-        file << j.dump(4); // The '4' adds indentation to make the file human-readable
+        file << j.dump(4);
       }
     }
     catch (const std::exception &e)

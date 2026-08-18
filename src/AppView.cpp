@@ -1,12 +1,13 @@
 #include "AppView.h"
 #include <imgui.h>
 #include <implot.h>
+#include <algorithm>
+#include <cstring>
 
 AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stocks)
 {
   AppEvents events;
 
-  // Render the Header directly here to easily fill the events struct
   if (ImGui::BeginMainMenuBar())
   {
     if (ImGui::BeginMenu("File"))
@@ -26,21 +27,44 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
       }
       ImGui::EndMenu();
     }
+
+    ImGui::Separator();
+    ImGui::SetNextItemWidth(120);
+    ImGui::InputTextWithHint("##TickerInput", "Symbol (e.g. MSFT)", m_tickerInput, IM_ARRAYSIZE(m_tickerInput));
+
+    if (ImGui::Button("Add Ticker"))
+    {
+      if (strlen(m_tickerInput) > 0)
+      {
+        std::string newSymbol = m_tickerInput;
+        std::transform(newSymbol.begin(), newSymbol.end(), newSymbol.begin(), ::toupper);
+        events.addTicker = newSymbol;
+        m_tickerInput[0] = '\0';
+      }
+    }
+
     ImGui::EndMainMenuBar();
   }
 
-  RenderWorkspace(stocks);
+  RenderWorkspace(stocks, events);
   RenderFooter();
 
   return events;
 }
 
-void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &stocks)
+void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &stocks, AppEvents &events)
 {
   for (const auto &[symbol, data] : stocks)
   {
     std::string windowName = symbol + " Chart";
-    ImGui::Begin(windowName.c_str());
+
+    bool isOpen = true;
+    ImGui::Begin(windowName.c_str(), &isOpen);
+
+    if (!isOpen)
+    {
+      events.removeTicker = symbol;
+    }
 
     if (!data.prices.empty())
     {
@@ -49,7 +73,8 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
 
     if (ImPlot::BeginPlot(symbol.c_str()))
     {
-      ImPlot::SetupAxes("Time (s)", "Price ($)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+      ImPlot::SetupAxes("Time (s)", "Price ($)");
+
       if (data.prices.size() > 1)
       {
         ImPlot::PlotLine(symbol.c_str(), data.timeAxis.data(), data.prices.data(), (int)data.prices.size());

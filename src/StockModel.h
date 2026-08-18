@@ -17,11 +17,8 @@ class StockModel
 public:
   void AddPrice(const std::string &symbol, float price, float time);
   std::unordered_map<std::string, StockData> GetStocks() const;
-  void LoadFromHistory(const std::unordered_map<std::string, StockData> &historyData)
-  {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_stocks = historyData; // Overwrite current state with the loaded file
-  }
+  void LoadFromHistory(const std::unordered_map<std::string, StockData> &historyData);
+  void RemoveStock(const std::string &symbol);
 
 private:
   mutable std::mutex m_mutex;
