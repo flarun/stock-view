@@ -2,36 +2,37 @@
 #include <imgui.h>
 #include <implot.h>
 
-bool AppView::Render(const std::unordered_map<std::string, StockData> &stocks)
+AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stocks)
 {
-  bool quitRequested = false;
+  AppEvents events;
 
-  if (RenderHeader())
-  {
-    quitRequested = true;
-  }
-  RenderWorkspace(stocks);
-  RenderFooter();
-
-  return quitRequested;
-}
-
-bool AppView::RenderHeader()
-{
-  bool quit = false;
+  // Render the Header directly here to easily fill the events struct
   if (ImGui::BeginMainMenuBar())
   {
     if (ImGui::BeginMenu("File"))
     {
+      if (ImGui::MenuItem("Save History"))
+      {
+        events.saveRequested = true;
+      }
+      if (ImGui::MenuItem("Load History"))
+      {
+        events.loadRequested = true;
+      }
+      ImGui::Separator();
       if (ImGui::MenuItem("Exit"))
       {
-        quit = true;
+        events.quit = true;
       }
       ImGui::EndMenu();
     }
     ImGui::EndMainMenuBar();
   }
-  return quit;
+
+  RenderWorkspace(stocks);
+  RenderFooter();
+
+  return events;
 }
 
 void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &stocks)

@@ -11,10 +11,54 @@
 #include <vector>
 #include <chrono>
 #include <future>
+#include <windows.h>
+#include <commdlg.h>
 
 #include "config.h"
 #include "StockModel.h"
 #include "AppView.h"
+#include "HistoryStorage.h"
+
+std::string OpenSaveFileDialog(HWND owner)
+{
+  OPENFILENAMEA ofn;
+  CHAR szFile[260] = {0};
+  ZeroMemory(&ofn, sizeof(OPENFILENAMEA));
+  ofn.lStructSize = sizeof(OPENFILENAMEA);
+  ofn.hwndOwner = owner;
+  ofn.lpstrFile = szFile;
+  ofn.nMaxFile = sizeof(szFile);
+  ofn.lpstrFilter = "JSON Files\0*.json\0All Files\0*.*\0";
+  ofn.nFilterIndex = 1;
+  ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
+  ofn.lpstrDefExt = "json";
+
+  if (GetSaveFileNameA(&ofn) == TRUE)
+  {
+    return std::string(ofn.lpstrFile);
+  }
+  return "";
+}
+
+std::string OpenLoadFileDialog(HWND owner)
+{
+  OPENFILENAMEA ofn;
+  CHAR szFile[260] = {0};
+  ZeroMemory(&ofn, sizeof(OPENFILENAMEA));
+  ofn.lStructSize = sizeof(OPENFILENAMEA);
+  ofn.hwndOwner = owner;
+  ofn.lpstrFile = szFile;
+  ofn.nMaxFile = sizeof(szFile);
+  ofn.lpstrFilter = "JSON Files\0*.json\0All Files\0*.*\0";
+  ofn.nFilterIndex = 1;
+  ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+  if (GetOpenFileNameA(&ofn) == TRUE)
+  {
+    return std::string(ofn.lpstrFile);
+  }
+  return "";
+}
 
 // --- Network Functions ---
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
@@ -181,10 +225,32 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    // 3. Render View using the Model's state
-    if (view.Render(model.GetStocks()))
+    // 3. Render View using the Model's state and capture events
+    AppEvents events = view.Render(model.GetStocks());
+
+    if (events.quit)
     {
-      done = true; // Exit menu clicked
+      done = true;
+    }
+    if (events.saveRequested)
+    {
+      std::string path = OpenSaveFileDialog(hwnd);
+      if (!path.empty())
+      {
+        HistoryStorage::Save(model.GetStocks(), path);
+      }
+    }
+    if (events.loadRequested)
+    {
+      std::string path = OpenLoadFileDialog(hwnd);
+      if (!path.empty())
+      {
+        auto loadedData = HistoryStorage::Load(path);
+        if (!loadedData.empty())
+        {
+          model.LoadFromHistory(loadedData);
+        }
+      }
     }
 
     ImGui::Render();
