@@ -9,7 +9,11 @@ find_package(implot CONFIG REQUIRED)
 find_package(CURL REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
-add_executable(stock_view WIN32 src/main.cpp)
+add_executable(stock_view WIN32 
+    src/main.cpp
+    src/StockModel.cpp 
+    src/AppView.cpp
+)
 
 target_link_libraries(stock_view PRIVATE
     imgui::imgui

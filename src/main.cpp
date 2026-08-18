@@ -8,15 +8,15 @@
 #include <nlohmann/json.hpp>
 #include <string>
 #include <iostream>
-#include "config.h"
 #include <vector>
 #include <chrono>
 #include <future>
 
-static std::vector<float> g_priceHistory;
-static std::vector<float> g_timeAxis;
-static float g_pollIntervalSeconds = 5.0f;
+#include "config.h"
+#include "StockModel.h"
+#include "AppView.h"
 
+// --- Network Functions ---
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
   ((std::string *)userp)->append((char *)contents, size * nmemb);
@@ -54,12 +54,11 @@ float FetchQuotePrice(const std::string &symbol)
   }
   catch (...)
   {
-    return -1.0f; // signals a fetch/parse failure
+    return -1.0f;
   }
 }
 
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
-
+// --- DirectX Globals ---
 static ID3D11Device *g_pd3dDevice = nullptr;
 static ID3D11DeviceContext *g_pd3dDeviceContext = nullptr;
 static IDXGISwapChain *g_pSwapChain = nullptr;
@@ -97,7 +96,7 @@ bool CreateDeviceD3D(HWND hWnd)
   return true;
 }
 
-extern LRESULT WndProc(HWND, UINT, WPARAM, LPARAM);
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -111,6 +110,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
   return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
+// --- Main Application Loop ---
 int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
 {
   WNDCLASSEX wc = {sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0, 0, hInstance,
@@ -130,11 +130,16 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   ImPlot::CreateContext();
   ImGui_ImplWin32_Init(hwnd);
   ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
-  auto lastPoll = std::chrono::steady_clock::now();
 
-  // Kick off the very first fetch on a background thread immediately
+  // Instantiate Model and View
+  StockModel model;
+  AppView view;
+
+  auto lastPoll = std::chrono::steady_clock::now();
   std::future<float> futurePrice = std::async(std::launch::async, FetchQuotePrice, "AAPL");
   bool isFetching = true;
+  float timeCounter = 0.0f;
+  const float pollIntervalSeconds = 5.0f;
 
   bool done = false;
   while (!done)
@@ -152,57 +157,35 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
 
     auto now = std::chrono::steady_clock::now();
 
-    // 1. If we are NOT fetching, check if 5 seconds have passed to start a new fetch
-    if (!isFetching && std::chrono::duration<float>(now - lastPoll).count() >= g_pollIntervalSeconds)
+    // 1. Controller logic: Dispatch new request if interval has passed
+    if (!isFetching && std::chrono::duration<float>(now - lastPoll).count() >= pollIntervalSeconds)
     {
       isFetching = true;
-      // Launch the network request on a background thread
       futurePrice = std::async(std::launch::async, FetchQuotePrice, "AAPL");
     }
 
-    // 2. If we ARE fetching, check if the background thread has finished its work
+    // 2. Controller logic: Process request if finished
     if (isFetching && futurePrice.valid() && futurePrice.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {
-      // The background thread is done. Safely get the result on the main thread.
       float p = futurePrice.get();
       if (p > 0)
       {
-        g_priceHistory.push_back(p);
-        g_timeAxis.push_back(g_timeAxis.empty() ? 0.0f : g_timeAxis.back() + 1.0f);
+        model.AddPrice("AAPL", p, timeCounter);
+        timeCounter += pollIntervalSeconds;
       }
-
-      isFetching = false;                          // Allow the timer to start counting toward the next fetch
-      lastPoll = std::chrono::steady_clock::now(); // Reset the timer
+      isFetching = false;
+      lastPoll = std::chrono::steady_clock::now();
     }
+
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::Begin("Stock View");
-    if (!g_priceHistory.empty())
+    // 3. Render View using the Model's state
+    if (view.Render(model.GetStocks()))
     {
-      ImGui::Text("AAPL last price: %.2f", g_priceHistory.back());
+      done = true; // Exit menu clicked
     }
-
-    if (ImPlot::BeginPlot("AAPL Price"))
-    {
-      // Automatically scale the X and Y axes to fit data
-      ImPlot::SetupAxes("Time (s)", "Price ($)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-
-      if (g_priceHistory.size() > 1)
-      {
-        // Continuous line
-        ImPlot::PlotLine("AAPL", g_timeAxis.data(), g_priceHistory.data(), (int)g_priceHistory.size());
-      }
-      else if (g_priceHistory.size() == 1)
-      {
-        // Circle
-        ImPlot::PlotScatter("AAPL", g_timeAxis.data(), g_priceHistory.data(), 1);
-      }
-
-      ImPlot::EndPlot();
-    }
-    ImGui::End();
 
     ImGui::Render();
     const float clear_color[4] = {0.1f, 0.1f, 0.1f, 1.0f};
