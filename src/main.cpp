@@ -183,12 +183,23 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
     {
       ImGui::Text("AAPL last price: %.2f", g_priceHistory.back());
     }
+
     if (ImPlot::BeginPlot("AAPL Price"))
     {
-      if (!g_priceHistory.empty())
+      // Automatically scale the X and Y axes to fit data
+      ImPlot::SetupAxes("Time (s)", "Price ($)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+
+      if (g_priceHistory.size() > 1)
       {
+        // Continuous line
         ImPlot::PlotLine("AAPL", g_timeAxis.data(), g_priceHistory.data(), (int)g_priceHistory.size());
       }
+      else if (g_priceHistory.size() == 1)
+      {
+        // Circle
+        ImPlot::PlotScatter("AAPL", g_timeAxis.data(), g_priceHistory.data(), 1);
+      }
+
       ImPlot::EndPlot();
     }
     ImGui::End();
