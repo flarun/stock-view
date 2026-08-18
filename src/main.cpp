@@ -11,6 +11,7 @@
 #include "config.h"
 #include <vector>
 #include <chrono>
+#include <future>
 
 static std::vector<float> g_priceHistory;
 static std::vector<float> g_timeAxis;
@@ -130,12 +131,10 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   ImGui_ImplWin32_Init(hwnd);
   ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
   auto lastPoll = std::chrono::steady_clock::now();
-  float price = FetchQuotePrice("AAPL");
-  if (price > 0)
-  {
-    g_priceHistory.push_back(price);
-    g_timeAxis.push_back(0.0f);
-  }
+
+  // Kick off the very first fetch on a background thread immediately
+  std::future<float> futurePrice = std::async(std::launch::async, FetchQuotePrice, "AAPL");
+  bool isFetching = true;
 
   bool done = false;
   while (!done)
@@ -150,16 +149,30 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
     }
     if (done)
       break;
+
     auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration<float>(now - lastPoll).count() >= g_pollIntervalSeconds)
+
+    // 1. If we are NOT fetching, check if 5 seconds have passed to start a new fetch
+    if (!isFetching && std::chrono::duration<float>(now - lastPoll).count() >= g_pollIntervalSeconds)
     {
-      lastPoll = now;
-      float p = FetchQuotePrice("AAPL");
+      isFetching = true;
+      // Launch the network request on a background thread
+      futurePrice = std::async(std::launch::async, FetchQuotePrice, "AAPL");
+    }
+
+    // 2. If we ARE fetching, check if the background thread has finished its work
+    if (isFetching && futurePrice.valid() && futurePrice.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+    {
+      // The background thread is done. Safely get the result on the main thread.
+      float p = futurePrice.get();
       if (p > 0)
       {
         g_priceHistory.push_back(p);
         g_timeAxis.push_back(g_timeAxis.empty() ? 0.0f : g_timeAxis.back() + 1.0f);
       }
+
+      isFetching = false;                          // Allow the timer to start counting toward the next fetch
+      lastPoll = std::chrono::steady_clock::now(); // Reset the timer
     }
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
