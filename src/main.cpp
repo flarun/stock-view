@@ -4,23 +4,21 @@
 #include <implot.h>
 #include <d3d11.h>
 #include <tchar.h>
-#include <curl/curl.h>
-#include <nlohmann/json.hpp>
 #include <windows.h>
 #include <commdlg.h>
 #include <string>
 #include <iostream>
 #include <vector>
 #include <chrono>
-#include <future>
 #include <algorithm>
 
-#include "config.h"
 #include "StockModel.h"
 #include "AppView.h"
 #include "HistoryStorage.h"
+#include "DataProvider.h"
+#include "DataService.h"
 
-// --- Windows Native Dialog Helpers ---
+// --- Windows Native Dialog Helpers (Same as before) ---
 std::string OpenSaveFileDialog(HWND owner)
 {
   OPENFILENAMEA ofn;
@@ -34,11 +32,8 @@ std::string OpenSaveFileDialog(HWND owner)
   ofn.nFilterIndex = 1;
   ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
   ofn.lpstrDefExt = "json";
-
   if (GetSaveFileNameA(&ofn) == TRUE)
-  {
     return std::string(ofn.lpstrFile);
-  }
   return "";
 }
 
@@ -54,57 +49,12 @@ std::string OpenLoadFileDialog(HWND owner)
   ofn.lpstrFilter = "JSON Files\0*.json\0All Files\0*.*\0";
   ofn.nFilterIndex = 1;
   ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-
   if (GetOpenFileNameA(&ofn) == TRUE)
-  {
     return std::string(ofn.lpstrFile);
-  }
   return "";
 }
 
-// --- Network Functions ---
-static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
-{
-  ((std::string *)userp)->append((char *)contents, size * nmemb);
-  return size * nmemb;
-}
-
-std::string FetchQuoteRaw(const std::string &symbol)
-{
-  CURL *curl = curl_easy_init();
-  std::string response;
-  if (curl)
-  {
-    std::string url = "https://finnhub.io/api/v1/quote?symbol=" + symbol + "&token=" + FINNHUB_API_KEY;
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-    CURLcode res = curl_easy_perform(curl);
-    if (res != CURLE_OK)
-    {
-      std::cerr << "curl error: " << curl_easy_strerror(res) << std::endl;
-    }
-    curl_easy_cleanup(curl);
-  }
-  return response;
-}
-
-float FetchQuotePrice(const std::string &symbol)
-{
-  std::string raw = FetchQuoteRaw(symbol);
-  try
-  {
-    auto j = nlohmann::json::parse(raw);
-    return j["c"].get<float>();
-  }
-  catch (...)
-  {
-    return -1.0f;
-  }
-}
-
-// --- DirectX Globals ---
+// --- DirectX Globals & Init (Same as before) ---
 static ID3D11Device *g_pd3dDevice = nullptr;
 static ID3D11DeviceContext *g_pd3dDeviceContext = nullptr;
 static IDXGISwapChain *g_pSwapChain = nullptr;
@@ -122,8 +72,6 @@ bool CreateDeviceD3D(HWND hWnd)
 {
   DXGI_SWAP_CHAIN_DESC sd = {};
   sd.BufferCount = 2;
-  sd.BufferDesc.Width = 0;
-  sd.BufferDesc.Height = 0;
   sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
   sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
   sd.OutputWindow = hWnd;
@@ -143,7 +91,6 @@ bool CreateDeviceD3D(HWND hWnd)
 }
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
-
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
   if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
@@ -156,18 +103,13 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
   return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
-// --- Main Application Loop ---
+// --- Main Loop ---
 int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
 {
-  // Ensures crisp rendering and fixes mouse misalignment on high-DPI displays
   ImGui_ImplWin32_EnableDpiAwareness();
-
-  WNDCLASSEX wc = {sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0, 0, hInstance,
-                   nullptr, nullptr, nullptr, nullptr, _T("StockView"), nullptr};
+  WNDCLASSEX wc = {sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0, 0, hInstance, nullptr, nullptr, nullptr, nullptr, _T("StockView"), nullptr};
   RegisterClassEx(&wc);
-  HWND hwnd = CreateWindow(wc.lpszClassName, _T("Stock View"), WS_OVERLAPPEDWINDOW,
-                           100, 100, 1000, 700, nullptr, nullptr, wc.hInstance, nullptr);
-
+  HWND hwnd = CreateWindow(wc.lpszClassName, _T("Stock View"), WS_OVERLAPPEDWINDOW, 100, 100, 1000, 700, nullptr, nullptr, wc.hInstance, nullptr);
   if (!CreateDeviceD3D(hwnd))
     return 1;
 
@@ -180,12 +122,16 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   ImGui_ImplWin32_Init(hwnd);
   ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
+  // 1. Initialize Architecture
   StockModel model;
   AppView view;
 
-  std::vector<std::string> activeTickers = {"AAPL"};
-  std::unordered_map<std::string, std::future<float>> pendingFetches;
+  // Inject the Finnhub provider into our DataService
+  auto provider = std::make_shared<FinnhubProvider>();
+  DataService dataService(model, provider);
+  dataService.Start(); // Boot up the background worker thread
 
+  std::vector<std::string> activeTickers = {"AAPL"};
   const float pollIntervalSeconds = 5.0f;
   auto lastPoll = std::chrono::steady_clock::now() - std::chrono::seconds(5);
   auto appStartTime = std::chrono::steady_clock::now();
@@ -207,55 +153,32 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
     auto now = std::chrono::steady_clock::now();
     float currentAppTime = std::chrono::duration<float>(now - appStartTime).count();
 
-    // 1. Controller logic: Dispatch new network requests
+    // 2. Scheduler Logic: Just dump tasks into the queue!
     if (std::chrono::duration<float>(now - lastPoll).count() >= pollIntervalSeconds)
     {
       for (const std::string &ticker : activeTickers)
       {
-        if (pendingFetches.find(ticker) == pendingFetches.end())
-        {
-          pendingFetches[ticker] = std::async(std::launch::async, FetchQuotePrice, ticker);
-        }
+        // We no longer manage threads. We just tell the service: "Get this data."
+        dataService.EnqueueFetch(ticker, currentAppTime);
       }
       lastPoll = now;
-    }
-
-    // 2. Controller logic: Check for completed network requests
-    for (auto it = pendingFetches.begin(); it != pendingFetches.end();)
-    {
-      if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-      {
-        float p = it->second.get();
-        if (p > 0)
-        {
-          model.AddPrice(it->first, p, currentAppTime);
-        }
-        it = pendingFetches.erase(it);
-      }
-      else
-      {
-        ++it;
-      }
     }
 
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    // 3. Render the View and handle user inputs
+    // 3. Render View & Handle Events
     AppEvents events = view.Render(model.GetStocks());
 
     if (events.quit)
-    {
       done = true;
-    }
+
     if (events.saveRequested)
     {
       std::string path = OpenSaveFileDialog(hwnd);
       if (!path.empty())
-      {
         HistoryStorage::Save(model.GetStocks(), path);
-      }
     }
     if (events.loadRequested)
     {
@@ -264,23 +187,23 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
       {
         auto loadedData = HistoryStorage::Load(path);
         if (!loadedData.empty())
-        {
           model.LoadFromHistory(loadedData);
-        }
       }
     }
+
     if (!events.addTicker.empty())
     {
       if (std::find(activeTickers.begin(), activeTickers.end(), events.addTicker) == activeTickers.end())
       {
         activeTickers.push_back(events.addTicker);
-        pendingFetches[events.addTicker] = std::async(std::launch::async, FetchQuotePrice, events.addTicker);
+        // Fetch the new ticker immediately
+        dataService.EnqueueFetch(events.addTicker, currentAppTime);
       }
     }
+
     if (!events.removeTicker.empty())
     {
       activeTickers.erase(std::remove(activeTickers.begin(), activeTickers.end(), events.removeTicker), activeTickers.end());
-      pendingFetches.erase(events.removeTicker);
       model.RemoveStock(events.removeTicker);
     }
 
@@ -291,6 +214,9 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
     g_pSwapChain->Present(1, 0);
   }
+
+  // 4. Clean Shutdown
+  dataService.Stop(); // Safely close the worker thread before destroying resources
 
   ImGui_ImplDX11_Shutdown();
   ImGui_ImplWin32_Shutdown();

@@ -13,6 +13,7 @@ add_executable(stock_view WIN32
     src/main.cpp
     src/StockModel.cpp 
     src/AppView.cpp
+    src/DataService.cpp
 )
 
 target_link_libraries(stock_view PRIVATE
