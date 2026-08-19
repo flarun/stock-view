@@ -22,4 +22,5 @@ private:
   void RenderFooter();
 
   char m_tickerInput[16] = "";
+  unsigned int m_centralNodeId = 0; // Remembers the center workspace area for new charts
 };

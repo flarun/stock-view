@@ -1,0 +1,13 @@
+{
+  "name": "stock-view",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "name": "imgui",
+      "features": ["docking-experimental", "dx11-binding", "win32-binding"]
+    },
+    "implot",
+    "curl",
+    "nlohmann-json"
+  ]
+}
