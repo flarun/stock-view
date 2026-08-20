@@ -68,6 +68,15 @@ void CreateRenderTarget()
   pBackBuffer->Release();
 }
 
+void CleanupRenderTarget()
+{
+  if (g_mainRenderTargetView)
+  {
+    g_mainRenderTargetView->Release();
+    g_mainRenderTargetView = nullptr;
+  }
+}
+
 bool CreateDeviceD3D(HWND hWnd)
 {
   DXGI_SWAP_CHAIN_DESC sd = {};
@@ -90,16 +99,31 @@ bool CreateDeviceD3D(HWND hWnd)
   return true;
 }
 
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
   if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
     return true;
+
+  // --- THE FIX: Tell DirectX to resize the canvas when the window resizes ---
+  if (msg == WM_SIZE)
+  {
+    if (g_pd3dDevice != nullptr && wParam != SIZE_MINIMIZED)
+    {
+      CleanupRenderTarget();
+      g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
+      CreateRenderTarget();
+    }
+    return 0;
+  }
+
   if (msg == WM_DESTROY)
   {
     PostQuitMessage(0);
     return 0;
   }
+
   return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
@@ -221,6 +245,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   // 4. Clean Shutdown
   dataService.Stop(); // Safely close the worker thread before destroying resources
 
+  CleanupRenderTarget();
   ImGui_ImplDX11_Shutdown();
   ImGui_ImplWin32_Shutdown();
   ImPlot::DestroyContext();
