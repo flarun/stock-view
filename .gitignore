@@ -33,3 +33,12 @@
 
 build/
 config.h
+
+# Windows Debug Symbols
+*.pdb
+
+# Local ImGui State
+imgui.ini
+
+# Script Dumps
+project_dump.txt
