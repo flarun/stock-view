@@ -58,7 +58,7 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   // --- WEST: Watchlist ---
   ImGui::SetNextWindowPos(ImVec2(workPos.x, workPos.y), ImGuiCond_Always);
   ImGui::SetNextWindowSize(ImVec2(westWidth, workSize.y - southHeight), ImGuiCond_Always);
-  ImGui::Begin("Watchlist (West)", nullptr, panelFlags);
+  ImGui::Begin("Watchlist", nullptr, panelFlags);
 
   ImGui::Text("Add New Stock:");
   ImGui::SetNextItemWidth(-FLT_MIN);
@@ -91,7 +91,7 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   // --- EAST: Details ---
   ImGui::SetNextWindowPos(ImVec2(workPos.x + workSize.x - eastWidth, workPos.y), ImGuiCond_Always);
   ImGui::SetNextWindowSize(ImVec2(eastWidth, workSize.y - southHeight), ImGuiCond_Always);
-  ImGui::Begin("Details (East)", nullptr, panelFlags);
+  ImGui::Begin("Details", nullptr, panelFlags);
   ImGui::Text("API Status: CONNECTED");
   ImGui::Separator();
   ImGui::Text("Provider: Finnhub.io");
@@ -101,7 +101,7 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   // --- SOUTH: Console/Footer ---
   ImGui::SetNextWindowPos(ImVec2(workPos.x, workPos.y + workSize.y - southHeight), ImGuiCond_Always);
   ImGui::SetNextWindowSize(ImVec2(workSize.x, southHeight), ImGuiCond_Always);
-  ImGui::Begin("Console (South)", nullptr, panelFlags);
+  ImGui::Begin("Console", nullptr, panelFlags);
   ImGui::Text("System initialized securely.");
   ImGui::Text("Data Service worker is running in the background...");
   ImGui::End();
