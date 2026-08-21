@@ -1,4 +1,5 @@
 #include "AppView.h"
+#include "ConfigManager.h"
 #include <imgui.h>
 #include <implot.h>
 #include <algorithm>
@@ -13,6 +14,11 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   {
     if (ImGui::BeginMenu("File"))
     {
+      if (ImGui::MenuItem("Settings..."))
+      {
+        m_showSettingsModal = true;
+      }
+      ImGui::Separator();
       if (ImGui::MenuItem("Save History"))
       {
         events.saveRequested = true;
@@ -112,6 +118,8 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   // Render the charts
   RenderWorkspace(stocks, events);
 
+  RenderSettingsModal();
+
   return events;
 }
 
@@ -150,5 +158,62 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
       ImPlot::EndPlot();
     }
     ImGui::End();
+  }
+}
+
+void AppView::RenderSettingsModal()
+{
+  if (m_showSettingsModal)
+  {
+    ImGui::OpenPopup("Preferences");
+    m_showSettingsModal = false;
+  }
+
+  ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+  ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+  ImGui::SetNextWindowSize(ImVec2(500, 350), ImGuiCond_FirstUseEver);
+
+  if (ImGui::BeginPopupModal("Preferences", nullptr, ImGuiWindowFlags_NoCollapse))
+  {
+    auto &settings = ConfigManager::GetInstance().GetSettings();
+    bool settingsChanged = false;
+
+    if (ImGui::BeginTabBar("SettingsTabs"))
+    {
+      // TAB 1: CHARTING
+      if (ImGui::BeginTabItem("Charting"))
+      {
+        ImGui::Spacing();
+        int currentChart = static_cast<int>(settings.chartStyle);
+        const char *items[] = {"Line Chart", "Candlestick"};
+        if (ImGui::Combo("Global Chart Style", &currentChart, items, IM_ARRAYSIZE(items)))
+        {
+          settings.chartStyle = static_cast<ChartStyle>(currentChart);
+          settingsChanged = true;
+        }
+        ImGui::EndTabItem();
+      }
+
+      // TAB 2: NETWORK
+      if (ImGui::BeginTabItem("Network"))
+      {
+        ImGui::Spacing();
+        if (ImGui::SliderInt("Polling Rate (ms)", &settings.pollingIntervalMs, 1000, 10000))
+        {
+          settingsChanged = true;
+        }
+        ImGui::EndTabItem();
+      }
+      ImGui::EndTabBar();
+    }
+
+    ImGui::Separator();
+    if (ImGui::Button("Close", ImVec2(120, 0)))
+    {
+      if (settingsChanged)
+        ConfigManager::GetInstance().Save();
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
   }
 }

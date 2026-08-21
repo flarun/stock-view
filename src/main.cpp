@@ -17,6 +17,7 @@
 #include "HistoryStorage.h"
 #include "DataProvider.h"
 #include "DataService.h"
+#include "ConfigManager.h"
 
 // --- Windows Native Dialog Helpers (Same as before) ---
 std::string OpenSaveFileDialog(HWND owner)
@@ -149,6 +150,8 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   ImGui_ImplWin32_Init(hwnd);
   ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
+  ConfigManager::GetInstance().Load();
+
   // 1. Initialize Architecture
   StockModel model;
   AppView view;
@@ -159,7 +162,6 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   dataService.Start(); // Boot up the background worker thread
 
   std::vector<std::string> activeTickers = {"AAPL"};
-  const float pollIntervalSeconds = 5.0f;
   auto lastPoll = std::chrono::steady_clock::now() - std::chrono::seconds(5);
   auto appStartTime = std::chrono::steady_clock::now();
 
@@ -181,11 +183,13 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
     float currentAppTime = std::chrono::duration<float>(now - appStartTime).count();
 
     // 2. Scheduler Logic: Just dump tasks into the queue!
-    if (std::chrono::duration<float>(now - lastPoll).count() >= pollIntervalSeconds)
+    // Get the live polling interval from the ConfigManager (convert ms to seconds)
+    float currentPollInterval = ConfigManager::GetInstance().GetSettings().pollingIntervalMs / 1000.0f;
+
+    if (std::chrono::duration<float>(now - lastPoll).count() >= currentPollInterval)
     {
       for (const std::string &ticker : activeTickers)
       {
-        // We no longer manage threads. We just tell the service: "Get this data."
         dataService.EnqueueFetch(ticker, currentAppTime);
       }
       lastPoll = now;

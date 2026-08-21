@@ -18,9 +18,10 @@ public:
   AppEvents Render(const std::unordered_map<std::string, StockData> &stocks);
 
 private:
+  void RenderSettingsModal();
   void RenderWorkspace(const std::unordered_map<std::string, StockData> &stocks, AppEvents &events);
-  void RenderFooter();
 
   char m_tickerInput[16] = "";
-  unsigned int m_centralNodeId = 0; // Remembers the center workspace area for new charts
+  unsigned int m_centralNodeId = 0;
+  bool m_showSettingsModal = false;
 };

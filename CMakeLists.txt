@@ -11,9 +11,16 @@ find_package(nlohmann_json CONFIG REQUIRED)
 
 add_executable(stock_view WIN32 
     src/main.cpp
-    src/StockModel.cpp 
     src/AppView.cpp
+    src/AppView.h
+    src/StockModel.cpp
+    src/StockModel.h
     src/DataService.cpp
+    src/DataService.h
+    src/DataProvider.h
+    src/HistoryStorage.h
+    src/ConfigManager.cpp
+    src/ConfigManager.h
 )
 
 target_link_libraries(stock_view PRIVATE
