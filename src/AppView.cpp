@@ -1,9 +1,12 @@
-#include "AppView.h"
-#include "ConfigManager.h"
 #include <imgui.h>
 #include <implot.h>
 #include <algorithm>
 #include <cstring>
+#include <memory>
+
+#include "AppView.h"
+#include "ConfigManager.h"
+#include "ChartRenderers.h"
 
 AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stocks)
 {
@@ -125,11 +128,21 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
 
 void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &stocks, AppEvents &events)
 {
+  // 1. Get the current global chart style
+  auto currentStyle = ConfigManager::GetInstance().GetSettings().chartStyle;
+
+  // 2. The Strategy Registry (Polymorphism in action)
+  static std::unordered_map<ChartStyle, std::unique_ptr<IChartRenderer>> renderers;
+  if (renderers.empty())
+  {
+    renderers[ChartStyle::Line] = std::make_unique<LineChartRenderer>();
+    renderers[ChartStyle::Candlestick] = std::make_unique<CandlestickRenderer>();
+  }
+
   for (const auto &[symbol, data] : stocks)
   {
     std::string windowName = symbol + " Chart";
 
-    // THE FIX: Force new charts to automatically snap into the center DockSpace
     ImGui::SetNextWindowDockID(m_centralNodeId, ImGuiCond_FirstUseEver);
 
     bool isOpen = true;
@@ -147,14 +160,10 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
     if (ImPlot::BeginPlot(symbol.c_str(), ImVec2(-1, -1)))
     {
       ImPlot::SetupAxes("Time (s)", "Price ($)");
-      if (data.prices.size() > 1)
-      {
-        ImPlot::PlotLine(symbol.c_str(), data.timeAxis.data(), data.prices.data(), (int)data.prices.size());
-      }
-      else if (data.prices.size() == 1)
-      {
-        ImPlot::PlotScatter(symbol.c_str(), data.timeAxis.data(), data.prices.data(), 1);
-      }
+
+      // 3. Render dynamically with zero branching
+      renderers[currentStyle]->Render(symbol, data);
+
       ImPlot::EndPlot();
     }
     ImGui::End();

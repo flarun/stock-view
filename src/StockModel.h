@@ -4,12 +4,21 @@
 #include <unordered_map>
 #include <mutex>
 
+struct OHLC
+{
+  float time;
+  float open;
+  float high;
+  float low;
+  float close;
+};
 struct StockData
 {
   std::string symbol;
   std::vector<float> prices;
   std::vector<float> timeAxis;
   bool isLive = true;
+  std::vector<OHLC> candles;
 };
 
 class StockModel

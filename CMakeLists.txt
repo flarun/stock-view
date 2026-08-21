@@ -21,6 +21,8 @@ add_executable(stock_view WIN32
     src/HistoryStorage.h
     src/ConfigManager.cpp
     src/ConfigManager.h
+    src/IChartRenderer.h
+    src/ChartRenderers.h
 )
 
 target_link_libraries(stock_view PRIVATE
