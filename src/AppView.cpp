@@ -159,7 +159,11 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
 
     if (ImPlot::BeginPlot(symbol.c_str(), ImVec2(-1, -1)))
     {
-      ImPlot::SetupAxes("Time (s)", "Price ($)");
+      // Pass ImPlotAxisFlags_AutoFit to BOTH X and Y axes.
+      // This tells ImPlot to automatically zoom and scale to fit your data
+      // on startup and dynamically as time moves forward, while still allowing
+      // manual user panning/zooming whenever you grab the chart.
+      ImPlot::SetupAxes("Time (s)", "Price ($)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
 
       // 3. Render dynamically with zero branching
       renderers[currentStyle]->Render(symbol, data);
