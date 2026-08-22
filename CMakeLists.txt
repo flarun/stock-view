@@ -32,3 +32,21 @@ target_link_libraries(stock_view PRIVATE
     nlohmann_json::nlohmann_json
     d3d11 d3dcompiler
 )
+
+# --- 1. Tell CMake what files to package ---
+# Install the main executable
+install(TARGETS stock_view DESTINATION bin)
+
+# Install required DLLs (like libcurl) alongside the exe
+install(FILES ${CMAKE_BINARY_DIR}/Debug/libcurl-d.dll DESTINATION bin OPTIONAL)
+install(FILES ${CMAKE_BINARY_DIR}/Release/libcurl.dll DESTINATION bin OPTIONAL)
+
+# --- 2. Configure CPack ---
+set(CPACK_PACKAGE_NAME "StockView")
+set(CPACK_PACKAGE_VENDOR "Your Name")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+
+# Generate a clean ZIP file (You can change this to "NSIS" later to make a Setup.exe wizard)
+set(CPACK_GENERATOR "ZIP") 
+
+include(CPack)

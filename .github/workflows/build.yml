@@ -1,0 +1,36 @@
+name: Build and Distribute
+
+on:
+  push:
+    branches: ["main"] # Runs every time you push to main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # (Optional) If you are not using a vcpkg.json manifest, uncomment the line below to install dependencies
+      # - name: Install Dependencies
+      #   run: vcpkg install imgui implot curl nlohmann-json
+
+      - name: Configure CMake
+        # We point CMake to GitHub's pre-installed vcpkg toolchain
+        run: cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Application
+        run: cmake --build build --config Release
+
+      - name: Package with CPack
+        # This runs CPack in the build folder to generate the ZIP
+        run: |
+          cd build
+          cpack -G ZIP -C Release
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockView-Windows-Build
+          path: build/*.zip
