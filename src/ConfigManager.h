@@ -11,6 +11,7 @@ struct AppSettings
 {
   ChartStyle chartStyle = ChartStyle::Line;
   int pollingIntervalMs = 5000;
+  std::string apiKey = "";
 };
 
 class ConfigManager

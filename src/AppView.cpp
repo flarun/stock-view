@@ -213,6 +213,28 @@ void AppView::RenderSettingsModal()
         }
         ImGui::EndTabItem();
       }
+      // TAB 3: API
+      if (ImGui::BeginTabItem("API"))
+      {
+        ImGui::Spacing();
+        ImGui::Text("Finnhub API Key:");
+
+        static char keyBuffer[128] = "";
+        if (keyBuffer[0] == '\0' && !settings.apiKey.empty())
+        {
+          strncpy(keyBuffer, settings.apiKey.c_str(), sizeof(keyBuffer) - 1);
+        }
+
+        if (ImGui::InputText("##APIKey", keyBuffer, IM_ARRAYSIZE(keyBuffer)))
+        {
+          settings.apiKey = std::string(keyBuffer);
+          settingsChanged = true;
+        }
+
+        ImGui::Spacing();
+        ImGui::TextDisabled("Get a free API key at finnhub.io");
+        ImGui::EndTabItem();
+      }
       ImGui::EndTabBar();
     }
 

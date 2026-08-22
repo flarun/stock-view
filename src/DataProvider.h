@@ -5,7 +5,8 @@
 #include <iostream>
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
-#include "config.h"
+
+#include "ConfigManager.h"
 
 // --- Token Bucket Rate Limiter ---
 class RateLimiter
@@ -72,7 +73,11 @@ public:
     std::string response;
     if (curl)
     {
-      std::string url = "https://finnhub.io/api/v1/quote?symbol=" + symbol + "&token=" + FINNHUB_API_KEY;
+      std::string apiKey = ConfigManager::GetInstance().GetSettings().apiKey;
+      if (apiKey.empty())
+        return -1.0f; // Halt if no key exists
+
+      std::string url = "https://finnhub.io/api/v1/quote?symbol=" + symbol + "&token=" + apiKey;
       curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
       curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
       curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);

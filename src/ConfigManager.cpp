@@ -15,6 +15,8 @@ void ConfigManager::Load()
       m_settings.chartStyle = static_cast<ChartStyle>(j["chartStyle"].get<int>());
     if (j.contains("pollingIntervalMs"))
       m_settings.pollingIntervalMs = j["pollingIntervalMs"].get<int>();
+    if (j.contains("apiKey"))
+      m_settings.apiKey = j["apiKey"].get<std::string>();
   }
 }
 
@@ -29,4 +31,5 @@ void ConfigManager::Save()
   {
     file << j.dump(4);
   }
+  j["apiKey"] = m_settings.apiKey;
 }

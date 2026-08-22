@@ -12,10 +12,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # --- ADD THIS NEW STEP ---
-      - name: Setup Dummy Config
-        run: copy src\config.h.example src\config.h
-
       - name: Configure CMake
         run: cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
 
