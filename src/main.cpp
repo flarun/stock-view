@@ -149,6 +149,15 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   ImGui_ImplWin32_Init(hwnd);
   ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
+  // --- DPI SCALING MATH ---
+  // Query Windows for the monitor's DPI (96 is the standard 100% scale)
+  float dpiScale = GetDpiForWindow(hwnd) / 96.0f;
+
+  // 1. Scale all the text
+  ImGui::GetIO().FontGlobalScale = dpiScale;
+
+  // 2. Scale all the UI elements (padding, borders, scrollbars)
+  ImGui::GetStyle().ScaleAllSizes(dpiScale);
 
   ConfigManager::GetInstance().Load();
 
