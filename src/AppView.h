@@ -15,7 +15,7 @@ struct AppEvents
 class AppView
 {
 public:
-  AppEvents Render(const std::unordered_map<std::string, StockData> &stocks);
+  AppEvents Render(const std::unordered_map<std::string, StockData> &stocks, bool hasApiError);
 
 private:
   void RenderSettingsModal();

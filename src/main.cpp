@@ -208,7 +208,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
     ImGui::NewFrame();
 
     // 3. Render View & Handle Events
-    AppEvents events = view.Render(model.GetStocks());
+    AppEvents events = view.Render(model.GetStocks(), model.HasApiError());
 
     if (events.quit)
       done = true;

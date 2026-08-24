@@ -3,6 +3,7 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
+#include <atomic>
 
 struct OHLC
 {
@@ -28,8 +29,11 @@ public:
   std::unordered_map<std::string, StockData> GetStocks() const;
   void LoadFromHistory(const std::unordered_map<std::string, StockData> &historyData);
   void RemoveStock(const std::string &symbol);
+  void SetApiError(bool isError) { m_apiError = isError; }
+  bool HasApiError() const { return m_apiError; }
 
 private:
   mutable std::mutex m_mutex;
   std::unordered_map<std::string, StockData> m_stocks;
+  std::atomic<bool> m_apiError{false};
 };

@@ -8,7 +8,7 @@
 #include "ConfigManager.h"
 #include "ChartRenderers.h"
 
-AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stocks)
+AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stocks, bool hasApiError)
 {
   AppEvents events;
 
@@ -92,7 +92,30 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   ImGui::SetNextWindowPos(ImVec2(workPos.x + workSize.x - eastWidth, workPos.y), ImGuiCond_Always);
   ImGui::SetNextWindowSize(ImVec2(eastWidth, workSize.y - southHeight), ImGuiCond_Always);
   ImGui::Begin("Details", nullptr, panelFlags);
-  ImGui::Text("API Status: CONNECTED");
+
+  // --- Check API Key Status ---
+  std::string currentKey = ConfigManager::GetInstance().GetSettings().apiKey;
+
+  if (currentKey.empty())
+  {
+    ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "API Status: MISSING KEY");
+    ImGui::TextWrapped("Go to File -> Settings to enter your Finnhub API Key.");
+  }
+  else if (hasApiError)
+  {
+    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "API Status: INVALID KEY / ERROR");
+    ImGui::TextWrapped("The API rejected the request. Check your key or internet connection.");
+  }
+  else if (stocks.empty())
+  {
+    // The key is present, but we haven't made any network calls to prove it works yet
+    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "API Status: READY (Idle)");
+  }
+  else
+  {
+    ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "API Status: CONNECTED");
+  }
+
   ImGui::Separator();
   ImGui::Text("Provider: Finnhub.io");
   ImGui::Text("Active Streams: %d", (int)stocks.size());

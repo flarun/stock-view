@@ -65,7 +65,12 @@ void DataService::WorkerLoop()
       double price = m_provider->FetchPrice(task.symbol);
       if (price > 0)
       {
+        m_model.SetApiError(false); // Success! Lower the flag.
         m_model.AddPrice(task.symbol, price, task.timeRequested);
+      }
+      else
+      {
+        m_model.SetApiError(true); // Failed! Raise the error flag.
       }
     }
     else
