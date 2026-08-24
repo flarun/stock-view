@@ -169,8 +169,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   auto provider = std::make_shared<FinnhubProvider>();
   DataService dataService(model, provider);
   dataService.Start(); // Boot up the background worker thread
-
-  std::vector<std::string> activeTickers = {"AAPL"};
+  auto &activeTickers = ConfigManager::GetInstance().GetSettings().activeTickers;
   auto lastPoll = std::chrono::steady_clock::now() - std::chrono::seconds(5);
   auto appStartTime = std::chrono::steady_clock::now();
 
@@ -236,6 +235,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
       if (std::find(activeTickers.begin(), activeTickers.end(), events.addTicker) == activeTickers.end())
       {
         activeTickers.push_back(events.addTicker);
+        ConfigManager::GetInstance().Save();
         // Fetch the new ticker immediately
         dataService.EnqueueFetch(events.addTicker, currentAppTime);
       }
@@ -245,6 +245,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
     {
       activeTickers.erase(std::remove(activeTickers.begin(), activeTickers.end(), events.removeTicker), activeTickers.end());
       model.RemoveStock(events.removeTicker);
+      ConfigManager::GetInstance().Save();
     }
 
     ImGui::Render();

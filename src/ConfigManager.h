@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 
 enum class ChartStyle
 {
@@ -14,6 +15,7 @@ struct AppSettings
   std::string apiKey = "";
   bool useLocalTime = true;
   bool use24HourClock = false;
+  std::vector<std::string> activeTickers = {};
 };
 
 class ConfigManager

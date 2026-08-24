@@ -21,6 +21,8 @@ void ConfigManager::Load()
       m_settings.useLocalTime = j["useLocalTime"].get<bool>();
     if (j.contains("use24HourClock"))
       m_settings.use24HourClock = j["use24HourClock"].get<bool>();
+    if (j.contains("activeTickers"))
+      m_settings.activeTickers = j["activeTickers"].get<std::vector<std::string>>();
   }
 }
 
@@ -31,6 +33,7 @@ void ConfigManager::Save()
   j["pollingIntervalMs"] = m_settings.pollingIntervalMs;
   j["useLocalTime"] = m_settings.useLocalTime;
   j["use24HourClock"] = m_settings.use24HourClock;
+  j["activeTickers"] = m_settings.activeTickers;
 
   std::ofstream file(m_configFilePath);
   if (file.is_open())
