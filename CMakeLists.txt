@@ -23,6 +23,7 @@ add_executable(stock_view WIN32
     src/ConfigManager.h
     src/IChartRenderer.h
     src/ChartRenderers.h
+    src/Logger.h
 )
 
 target_link_libraries(stock_view PRIVATE

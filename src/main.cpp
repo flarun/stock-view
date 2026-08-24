@@ -18,6 +18,7 @@
 #include "DataProvider.h"
 #include "DataService.h"
 #include "ConfigManager.h"
+#include "Logger.h"
 
 // --- Windows Native Dialog Helpers (Same as before) ---
 std::string OpenSaveFileDialog(HWND owner)
@@ -160,6 +161,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   ImGui::GetStyle().ScaleAllSizes(dpiScale);
 
   ConfigManager::GetInstance().Load();
+  Logger::GetInstance().Log("[SYSTEM] Application booted. Settings loaded.");
 
   // 1. Initialize Architecture
   StockModel model;
@@ -235,6 +237,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
       if (std::find(activeTickers.begin(), activeTickers.end(), events.addTicker) == activeTickers.end())
       {
         activeTickers.push_back(events.addTicker);
+        Logger::GetInstance().Log("[WATCHLIST] Added ticker: " + events.addTicker);
         ConfigManager::GetInstance().Save();
         // Fetch the new ticker immediately
         dataService.EnqueueFetch(events.addTicker, currentAppTime);
@@ -244,6 +247,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
     if (!events.removeTicker.empty())
     {
       activeTickers.erase(std::remove(activeTickers.begin(), activeTickers.end(), events.removeTicker), activeTickers.end());
+      Logger::GetInstance().Log("[WATCHLIST] Removed ticker: " + events.removeTicker);
       model.RemoveStock(events.removeTicker);
       ConfigManager::GetInstance().Save();
     }

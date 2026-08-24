@@ -7,6 +7,7 @@
 #include "AppView.h"
 #include "ConfigManager.h"
 #include "ChartRenderers.h"
+#include "Logger.h"
 
 AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stocks, bool hasApiError)
 {
@@ -125,8 +126,19 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   ImGui::SetNextWindowPos(ImVec2(workPos.x, workPos.y + workSize.y - southHeight), ImGuiCond_Always);
   ImGui::SetNextWindowSize(ImVec2(workSize.x, southHeight), ImGuiCond_Always);
   ImGui::Begin("Console", nullptr, panelFlags);
-  ImGui::Text("System initialized securely.");
-  ImGui::Text("Data Service worker is running in the background...");
+
+  // 1. Render all logs
+  for (const std::string &log : Logger::GetInstance().GetLogs())
+  {
+    ImGui::TextUnformatted(log.c_str());
+  }
+
+  // 2. Auto-scroll to the bottom when a new message arrives
+  if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+  {
+    ImGui::SetScrollHereY(1.0f);
+  }
+
   ImGui::End();
 
   // --- CENTER: The Workspace Container ---

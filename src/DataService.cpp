@@ -1,4 +1,5 @@
 #include "DataService.h"
+#include "Logger.h"
 
 DataService::DataService(StockModel &model, std::shared_ptr<IDataProvider> provider)
     : m_model(model), m_provider(provider) {}
@@ -61,6 +62,9 @@ void DataService::WorkerLoop()
     // 2. Check the Rate Limiter (Token Bucket)
     if (m_provider->CanFetch())
     {
+      // --- LOG INJECTION 1: Tell the console we are fetching ---
+      Logger::GetInstance().Log("[NETWORK] Fetching data for " + task.symbol + "...");
+
       // Token acquired! Fetch the data.
       double price = m_provider->FetchPrice(task.symbol);
       if (price > 0)
@@ -71,10 +75,16 @@ void DataService::WorkerLoop()
       else
       {
         m_model.SetApiError(true); // Failed! Raise the error flag.
+
+        // --- LOG INJECTION 2: Tell the console the API rejected it ---
+        Logger::GetInstance().Log("[ERROR] API rejected request for " + task.symbol + ". Invalid key?");
       }
     }
     else
     {
+      // --- LOG INJECTION 3: Tell the console we are rate limited ---
+      Logger::GetInstance().Log("[NETWORK] Rate limit hit. Waiting for token...");
+
       // 3. Rate Limit hit! Put the task back at the front and wait briefly
       {
         std::lock_guard<std::mutex> lock(m_queueMutex);
