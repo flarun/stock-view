@@ -128,8 +128,12 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
 
 void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &stocks, AppEvents &events)
 {
-  // 1. Get the current global chart style
-  auto currentStyle = ConfigManager::GetInstance().GetSettings().chartStyle;
+  // 1. Get settings and apply global ImPlot styles
+  auto &settings = ConfigManager::GetInstance().GetSettings();
+  auto currentStyle = settings.chartStyle;
+
+  ImPlot::GetStyle().UseLocalTime = settings.useLocalTime;
+  ImPlot::GetStyle().Use24HourClock = settings.use24HourClock;
 
   // 2. The Strategy Registry (Polymorphism in action)
   static std::unordered_map<ChartStyle, std::unique_ptr<IChartRenderer>> renderers;
@@ -202,6 +206,23 @@ void AppView::RenderSettingsModal()
         if (ImGui::Combo("Global Chart Style", &currentChart, items, IM_ARRAYSIZE(items)))
         {
           settings.chartStyle = static_cast<ChartStyle>(currentChart);
+          settingsChanged = true;
+        }
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::Text("Time Formatting:");
+
+        // Map the boolean to a 0 or 1 for the Combo box
+        int tzIndex = settings.useLocalTime ? 0 : 1;
+        const char *tzItems[] = {"Local OS Time", "UTC (Coordinated Universal Time)"};
+        if (ImGui::Combo("Timezone", &tzIndex, tzItems, IM_ARRAYSIZE(tzItems)))
+        {
+          settings.useLocalTime = (tzIndex == 0);
+          settingsChanged = true;
+        }
+
+        if (ImGui::Checkbox("Use 24-Hour Clock", &settings.use24HourClock))
+        {
           settingsChanged = true;
         }
         ImGui::EndTabItem();

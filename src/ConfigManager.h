@@ -12,6 +12,8 @@ struct AppSettings
   ChartStyle chartStyle = ChartStyle::Line;
   int pollingIntervalMs = 5000;
   std::string apiKey = "";
+  bool useLocalTime = true;
+  bool use24HourClock = false;
 };
 
 class ConfigManager
