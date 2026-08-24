@@ -52,14 +52,15 @@ class IDataProvider
 public:
   virtual ~IDataProvider() = default;
   virtual bool CanFetch() = 0;
-  virtual float FetchPrice(const std::string &symbol) = 0;
+
+  // 1. Changed to return double
+  virtual double FetchPrice(const std::string &symbol) = 0;
 };
 
 // --- Finnhub Concrete Implementation ---
 class FinnhubProvider : public IDataProvider
 {
 public:
-  // Finnhub allows 60 calls per minute (1 token per second)
   FinnhubProvider() : m_rateLimiter(60, 1.0f) {}
 
   bool CanFetch() override
@@ -67,7 +68,8 @@ public:
     return m_rateLimiter.TryConsume();
   }
 
-  float FetchPrice(const std::string &symbol) override
+  // 2. Changed to return double
+  double FetchPrice(const std::string &symbol) override
   {
     CURL *curl = curl_easy_init();
     std::string response;
@@ -75,7 +77,7 @@ public:
     {
       std::string apiKey = ConfigManager::GetInstance().GetSettings().apiKey;
       if (apiKey.empty())
-        return -1.0f; // Halt if no key exists
+        return -1.0; // 3. Changed to -1.0 (double)
 
       std::string url = "https://finnhub.io/api/v1/quote?symbol=" + symbol + "&token=" + apiKey;
       curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -94,11 +96,13 @@ public:
     try
     {
       auto j = nlohmann::json::parse(response);
-      return j["c"].get<float>();
+
+      // 4. Changed to get<double>()
+      return j["c"].get<double>();
     }
     catch (...)
     {
-      return -1.0f;
+      return -1.0; // 5. Changed to -1.0 (double)
     }
   }
 

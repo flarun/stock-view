@@ -6,17 +6,17 @@
 
 struct OHLC
 {
-  float time;
-  float open;
-  float high;
-  float low;
-  float close;
+  double time;
+  double open;
+  double high;
+  double low;
+  double close;
 };
 struct StockData
 {
   std::string symbol;
-  std::vector<float> prices;
-  std::vector<float> timeAxis;
+  std::vector<double> prices;
+  std::vector<double> timeAxis;
   bool isLive = true;
   std::vector<OHLC> candles;
 };
@@ -24,7 +24,7 @@ struct StockData
 class StockModel
 {
 public:
-  void AddPrice(const std::string &symbol, float price, float time);
+  void AddPrice(const std::string &symbol, double price, double time);
   std::unordered_map<std::string, StockData> GetStocks() const;
   void LoadFromHistory(const std::unordered_map<std::string, StockData> &historyData);
   void RemoveStock(const std::string &symbol);

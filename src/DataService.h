@@ -11,7 +11,7 @@
 struct FetchTask
 {
   std::string symbol;
-  float timeRequested;
+  double timeRequested;
 };
 
 class DataService
@@ -24,7 +24,7 @@ public:
   void Stop();
 
   // UI thread calls this to request data
-  void EnqueueFetch(const std::string &symbol, float appTime);
+  void EnqueueFetch(const std::string &symbol, double appTime);
 
 private:
   void WorkerLoop();

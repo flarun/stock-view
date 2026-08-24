@@ -189,7 +189,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
       break;
 
     auto now = std::chrono::steady_clock::now();
-    float currentAppTime = std::chrono::duration<float>(now - appStartTime).count();
+    double currentAppTime = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
 
     // 2. Scheduler Logic: Just dump tasks into the queue!
     // Get the live polling interval from the ConfigManager (convert ms to seconds)

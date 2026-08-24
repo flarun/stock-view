@@ -1,7 +1,7 @@
 #include "StockModel.h"
 #include <algorithm> // Required for std::max and std::min
 
-void StockModel::AddPrice(const std::string &symbol, float price, float time)
+void StockModel::AddPrice(const std::string &symbol, double price, double time)
 {
   std::lock_guard<std::mutex> lock(m_mutex);
 
@@ -12,25 +12,21 @@ void StockModel::AddPrice(const std::string &symbol, float price, float time)
 
   // 2. Aggregate the OHLC Candlestick data
   auto &data = m_stocks[symbol];
-  const float BUCKET_SIZE = 5.0f; // Group ticks into 5-second candles
+  const double BUCKET_SIZE = 5.0; // Changed to double
 
   if (data.candles.empty())
   {
-    // First tick: Open, High, Low, and Close are all the same
     data.candles.push_back({time, price, price, price, price});
   }
   else
   {
     auto &last = data.candles.back();
-
     if (time - last.time >= BUCKET_SIZE)
     {
-      // Time gap exceeded: Start a brand new candle
       data.candles.push_back({last.time + BUCKET_SIZE, price, price, price, price});
     }
     else
     {
-      // Still inside the time window: Update the current candle
       last.high = std::max(last.high, price);
       last.low = std::min(last.low, price);
       last.close = price;

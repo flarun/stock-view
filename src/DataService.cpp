@@ -30,7 +30,7 @@ void DataService::Stop()
   }
 }
 
-void DataService::EnqueueFetch(const std::string &symbol, float appTime)
+void DataService::EnqueueFetch(const std::string &symbol, double appTime)
 {
   {
     std::lock_guard<std::mutex> lock(m_queueMutex);
@@ -62,7 +62,7 @@ void DataService::WorkerLoop()
     if (m_provider->CanFetch())
     {
       // Token acquired! Fetch the data.
-      float price = m_provider->FetchPrice(task.symbol);
+      double price = m_provider->FetchPrice(task.symbol);
       if (price > 0)
       {
         m_model.AddPrice(task.symbol, price, task.timeRequested);
