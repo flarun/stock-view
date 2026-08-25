@@ -1,11 +1,23 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 enum class ChartStyle
 {
   Line,
   Candlestick
+};
+enum class IndicatorType
+{
+  SMA
+};
+
+struct IndicatorConfig
+{
+  IndicatorType type = IndicatorType::SMA;
+  int period = 10;
+  float color[4] = {1.0f, 0.65f, 0.0f, 1.0f}; // Default Orange
 };
 
 struct AppSettings
@@ -16,6 +28,7 @@ struct AppSettings
   bool useLocalTime = true;
   bool use24HourClock = false;
   std::vector<std::string> activeTickers = {};
+  std::unordered_map<std::string, std::vector<IndicatorConfig>> indicators;
 };
 
 class ConfigManager

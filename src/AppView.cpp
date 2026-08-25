@@ -8,6 +8,7 @@
 #include "ConfigManager.h"
 #include "ChartRenderers.h"
 #include "Logger.h"
+#include "Indicators.h"
 
 AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stocks, bool hasApiError)
 {
@@ -194,8 +195,52 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
     if (!data.prices.empty())
     {
       ImGui::Text("Last price: %.2f", data.prices.back());
+      ImGui::SameLine(ImGui::GetWindowWidth() - 150);
+      if (ImGui::Button("+ Add Indicator"))
+      {
+        ImGui::OpenPopup("IndicatorPopup");
+      }
     }
 
+    // --- INDICATOR ADD MENU ---
+    if (ImGui::BeginPopup("IndicatorPopup"))
+    {
+      if (ImGui::MenuItem("Simple Moving Average (SMA)"))
+      {
+        settings.indicators[symbol].push_back(IndicatorConfig{IndicatorType::SMA, 10});
+        ConfigManager::GetInstance().Save();
+      }
+      ImGui::EndPopup();
+    }
+
+    // --- INDICATOR EDITOR PANEL ---
+    auto &activeIndicators = settings.indicators[symbol];
+    for (int i = 0; i < activeIndicators.size(); ++i)
+    {
+      auto &ind = activeIndicators[i];
+      ImGui::PushID(i);
+      ImGui::SetNextItemWidth(80);
+
+      // Ensure you pass &ind.period here
+      if (ImGui::InputInt("Period", &ind.period))
+        ConfigManager::GetInstance().Save();
+
+      ImGui::SameLine();
+
+      // Ensure you pass ind.color here
+      if (ImGui::ColorEdit4("Color", ind.color, ImGuiColorEditFlags_NoInputs))
+        ConfigManager::GetInstance().Save();
+
+      ImGui::SameLine();
+      if (ImGui::Button("X"))
+      {
+        activeIndicators.erase(activeIndicators.begin() + i);
+        ConfigManager::GetInstance().Save();
+        ImGui::PopID();
+        break;
+      }
+      ImGui::PopID();
+    }
     if (ImPlot::BeginPlot(symbol.c_str(), ImVec2(-1, -1)))
     {
       // Keep AutoFit on both axes, but remove the Time flag from here
@@ -206,7 +251,20 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
 
       // 3. Render dynamically with zero branching
       renderers[currentStyle]->Render(symbol, data);
+      // 3. Render dynamically with zero branching
+      renderers[currentStyle]->Render(symbol, data);
 
+      // 4. OVERLAY ALL ACTIVE INDICATORS
+      if (settings.indicators.count(symbol))
+      {
+        for (const auto &indConfig : settings.indicators[symbol])
+        {
+          if (auto ind = IndicatorRegistry::Get(indConfig.type))
+          {
+            ind->Render(symbol, data, indConfig);
+          }
+        }
+      }
       ImPlot::EndPlot();
     }
     ImGui::End();

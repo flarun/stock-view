@@ -24,6 +24,7 @@ add_executable(stock_view WIN32
     src/IChartRenderer.h
     src/ChartRenderers.h
     src/Logger.h
+    src/Indicators.h
 )
 
 target_link_libraries(stock_view PRIVATE

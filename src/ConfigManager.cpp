@@ -4,6 +4,23 @@
 
 using json = nlohmann::json;
 
+// JSON serializers for  modular config
+inline void to_json(json &j, const IndicatorConfig &c)
+{
+  j = json{{"type", static_cast<int>(c.type)}, {"period", c.period}, {"color", {c.color[0], c.color[1], c.color[2], c.color[3]}}};
+}
+inline void from_json(const json &j, IndicatorConfig &c)
+{
+  c.type = static_cast<IndicatorType>(j.at("type").get<int>());
+  j.at("period").get_to(c.period);
+  auto col = j.at("color").get<std::vector<float>>();
+  if (col.size() == 4)
+  {
+    for (int i = 0; i < 4; ++i)
+      c.color[i] = col[i];
+  }
+}
+
 void ConfigManager::Load()
 {
   std::ifstream file(m_configFilePath);
@@ -23,6 +40,8 @@ void ConfigManager::Load()
       m_settings.use24HourClock = j["use24HourClock"].get<bool>();
     if (j.contains("activeTickers"))
       m_settings.activeTickers = j["activeTickers"].get<std::vector<std::string>>();
+    if (j.contains("indicators"))
+      m_settings.indicators = j["indicators"].get<std::unordered_map<std::string, std::vector<IndicatorConfig>>>();
   }
 }
 
@@ -34,6 +53,7 @@ void ConfigManager::Save()
   j["useLocalTime"] = m_settings.useLocalTime;
   j["use24HourClock"] = m_settings.use24HourClock;
   j["activeTickers"] = m_settings.activeTickers;
+  j["indicators"] = m_settings.indicators;
 
   std::ofstream file(m_configFilePath);
   if (file.is_open())
