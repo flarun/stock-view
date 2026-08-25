@@ -31,13 +31,13 @@ void DataService::Stop()
   }
 }
 
-void DataService::EnqueueFetch(const std::string &symbol, double appTime)
+void DataService::EnqueueFetch(const std::string &symbol, double appTime, TaskType type)
 {
   {
     std::lock_guard<std::mutex> lock(m_queueMutex);
-    m_queue.push({symbol, appTime});
+    m_queue.push({symbol, appTime, type});
   }
-  m_cv.notify_one(); // Tell the worker thread a new task has arrived
+  m_cv.notify_one();
 }
 
 void DataService::WorkerLoop()
@@ -62,22 +62,57 @@ void DataService::WorkerLoop()
     // 2. Check the Rate Limiter (Token Bucket)
     if (m_provider->CanFetch())
     {
-      // --- LOG INJECTION 1: Tell the console we are fetching ---
-      Logger::GetInstance().Log("[NETWORK] Fetching data for " + task.symbol + "...");
-
-      // Token acquired! Fetch the data.
-      double price = m_provider->FetchPrice(task.symbol);
-      if (price > 0)
+      if (task.type == TaskType::History)
       {
-        m_model.SetApiError(false); // Success! Lower the flag.
-        m_model.AddPrice(task.symbol, price, task.timeRequested);
+        Logger::GetInstance().Log("[NETWORK] Fetching history for " + task.symbol + "...");
+
+        // Grab the last 3 days (to ensure we capture data even over a weekend)
+        long long toTime = static_cast<long long>(std::chrono::system_clock::now().time_since_epoch() / std::chrono::seconds(1));
+        long long fromTime = toTime - (86400 * 7);
+
+        HistoryChunk chunk = m_provider->FetchHistory(task.symbol, fromTime, toTime);
+        if (!chunk.prices.empty())
+        {
+          m_model.SetApiError(false);
+          for (size_t i = 0; i < chunk.prices.size(); ++i)
+          {
+            m_model.AddPrice(task.symbol, chunk.prices[i], chunk.timestamps[i]);
+          }
+          Logger::GetInstance().Log("[SYSTEM] Loaded " + std::to_string(chunk.prices.size()) + " historical points for " + task.symbol);
+        }
+        else
+        {
+          // --- THE FIX: Graceful Fallback ---
+          Logger::GetInstance().Log("[WARNING] History denied for " + task.symbol + ". Falling back to Live data!");
+          
+          // Instantly grab a single live price so the chart has at least one data point
+          double fallbackPrice = m_provider->FetchPrice(task.symbol);
+          if (fallbackPrice > 0)
+          {
+            m_model.SetApiError(false);
+            m_model.AddPrice(task.symbol, fallbackPrice, task.timeRequested);
+          }
+          else 
+          {
+            m_model.SetApiError(true);
+          }
+        }
       }
       else
       {
-        m_model.SetApiError(true); // Failed! Raise the error flag.
-
-        // --- LOG INJECTION 2: Tell the console the API rejected it ---
-        Logger::GetInstance().Log("[ERROR] API rejected request for " + task.symbol + ". Invalid key?");
+        // --- EXISTING LIVE FETCH LOGIC ---
+        Logger::GetInstance().Log("[NETWORK] Fetching live data for " + task.symbol + "...");
+        double price = m_provider->FetchPrice(task.symbol);
+        if (price > 0)
+        {
+          m_model.SetApiError(false);
+          m_model.AddPrice(task.symbol, price, task.timeRequested);
+        }
+        else
+        {
+          m_model.SetApiError(true);
+          Logger::GetInstance().Log("[ERROR] API rejected request for " + task.symbol + ". Invalid key?");
+        }
       }
     }
     else

@@ -8,10 +8,16 @@
 #include "StockModel.h"
 #include "DataProvider.h"
 
+enum class TaskType
+{
+  Live,
+  History
+};
 struct FetchTask
 {
   std::string symbol;
   double timeRequested;
+  TaskType type = TaskType::Live;
 };
 
 class DataService
@@ -24,7 +30,8 @@ public:
   void Stop();
 
   // UI thread calls this to request data
-  void EnqueueFetch(const std::string &symbol, double appTime);
+  // Updated to accept a task type
+  void EnqueueFetch(const std::string &symbol, double appTime, TaskType type = TaskType::Live);
 
 private:
   void WorkerLoop();

@@ -172,6 +172,11 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
   DataService dataService(model, provider);
   dataService.Start(); // Boot up the background worker thread
   auto &activeTickers = ConfigManager::GetInstance().GetSettings().activeTickers;
+  // Backfill history for all saved tickers on startup
+  for (const std::string &ticker : activeTickers)
+  {
+    dataService.EnqueueFetch(ticker, 0.0, TaskType::History);
+  }
   auto lastPoll = std::chrono::steady_clock::now() - std::chrono::seconds(5);
   auto appStartTime = std::chrono::steady_clock::now();
 
@@ -198,9 +203,22 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
 
     if (std::chrono::duration<float>(now - lastPoll).count() >= currentPollInterval)
     {
+      // Grab a snapshot of the current charts
+      auto currentStocks = model.GetStocks();
+
       for (const std::string &ticker : activeTickers)
       {
-        dataService.EnqueueFetch(ticker, currentAppTime);
+        // SELF-HEALING LOGIC:
+        // If the chart doesn't exist yet, or it has 0 prices, queue a History task!
+        // Otherwise, just append the newest Live tick.
+        if (currentStocks.find(ticker) == currentStocks.end() || currentStocks[ticker].prices.empty())
+        {
+          dataService.EnqueueFetch(ticker, currentAppTime, TaskType::History);
+        }
+        else
+        {
+          dataService.EnqueueFetch(ticker, currentAppTime, TaskType::Live);
+        }
       }
       lastPoll = now;
     }
@@ -239,8 +257,9 @@ int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
         activeTickers.push_back(events.addTicker);
         Logger::GetInstance().Log("[WATCHLIST] Added ticker: " + events.addTicker);
         ConfigManager::GetInstance().Save();
-        // Fetch the new ticker immediately
-        dataService.EnqueueFetch(events.addTicker, currentAppTime);
+
+        // Fetch the historical backfill immediately
+        dataService.EnqueueFetch(events.addTicker, currentAppTime, TaskType::History);
       }
     }
 

@@ -54,6 +54,7 @@ void ConfigManager::Save()
   j["use24HourClock"] = m_settings.use24HourClock;
   j["activeTickers"] = m_settings.activeTickers;
   j["indicators"] = m_settings.indicators;
+  j["apiKey"] = m_settings.apiKey;
 
   std::ofstream file(m_configFilePath);
   if (file.is_open())
