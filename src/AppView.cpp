@@ -39,6 +39,10 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
       }
       ImGui::EndMenu();
     }
+    float fps = ImGui::GetIO().Framerate;
+    std::string fpsText = "FPS: " + std::to_string((int)fps);
+    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize(fpsText.c_str()).x - 20.0f);
+    ImGui::TextDisabled("%s", fpsText.c_str());
     ImGui::EndMainMenuBar();
   }
 
@@ -128,6 +132,12 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   ImGui::SetNextWindowSize(ImVec2(workSize.x, southHeight), ImGuiCond_Always);
   ImGui::Begin("Console", nullptr, panelFlags);
 
+  if (ImGui::Button("Clear Logs"))
+  {
+    Logger::GetInstance().Clear();
+  }
+
+  ImGui::Separator();
   // 1. Render all logs
   for (const std::string &log : Logger::GetInstance().GetLogs())
   {
@@ -343,7 +353,7 @@ void AppView::RenderSettingsModal()
           strncpy(keyBuffer, settings.apiKey.c_str(), sizeof(keyBuffer) - 1);
         }
 
-        if (ImGui::InputText("##APIKey", keyBuffer, IM_ARRAYSIZE(keyBuffer)))
+        if (ImGui::InputText("##APIKey", keyBuffer, IM_ARRAYSIZE(keyBuffer), ImGuiInputTextFlags_Password))
         {
           settings.apiKey = std::string(keyBuffer);
           settingsChanged = true;

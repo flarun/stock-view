@@ -40,6 +40,12 @@ public:
     return std::vector<std::string>(m_logs.begin(), m_logs.end());
   }
 
+  void Clear()
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_logs.clear();
+  }
+
 private:
   Logger() = default;
   std::deque<std::string> m_logs;
