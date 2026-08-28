@@ -46,3 +46,4 @@ project_dump.txt
 # --- SECURITY ---
 # Never commit the local user settings/API keys!
 settings.json
+.secret
