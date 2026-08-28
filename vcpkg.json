@@ -4,10 +4,9 @@
   "dependencies": [
     {
       "name": "imgui",
-      "features": ["docking-experimental", "dx11-binding", "win32-binding"]
+      "features": ["docking-experimental", "opengl3-binding", "glfw-binding"]
     },
     "implot",
-    "curl",
     "nlohmann-json"
   ]
 }

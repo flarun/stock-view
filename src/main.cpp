@@ -1,11 +1,8 @@
 #include <imgui.h>
-#include <imgui_impl_win32.h>
-#include <imgui_impl_dx11.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 #include <implot.h>
-#include <d3d11.h>
-#include <tchar.h>
-#include <windows.h>
-#include <commdlg.h>
+#include <GLFW/glfw3.h>
 #include <string>
 #include <iostream>
 #include <vector>
@@ -20,272 +17,161 @@
 #include "ConfigManager.h"
 #include "Logger.h"
 
-// --- Windows Native Dialog Helpers (Same as before) ---
-std::string OpenSaveFileDialog(HWND owner)
+// --- Linux Save/Load Helpers (Simplified) ---
+std::string OpenSaveFileDialog() { return "stock_history.json"; }
+std::string OpenLoadFileDialog() { return "stock_history.json"; }
+
+static void glfw_error_callback(int error, const char* description)
 {
-  OPENFILENAMEA ofn;
-  CHAR szFile[260] = {0};
-  ZeroMemory(&ofn, sizeof(OPENFILENAMEA));
-  ofn.lStructSize = sizeof(OPENFILENAMEA);
-  ofn.hwndOwner = owner;
-  ofn.lpstrFile = szFile;
-  ofn.nMaxFile = sizeof(szFile);
-  ofn.lpstrFilter = "JSON Files\0*.json\0All Files\0*.*\0";
-  ofn.nFilterIndex = 1;
-  ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
-  ofn.lpstrDefExt = "json";
-  if (GetSaveFileNameA(&ofn) == TRUE)
-    return std::string(ofn.lpstrFile);
-  return "";
+    std::cerr << "GLFW Error " << error << ": " << description << std::endl;
 }
 
-std::string OpenLoadFileDialog(HWND owner)
+int main(int, char**)
 {
-  OPENFILENAMEA ofn;
-  CHAR szFile[260] = {0};
-  ZeroMemory(&ofn, sizeof(OPENFILENAMEA));
-  ofn.lStructSize = sizeof(OPENFILENAMEA);
-  ofn.hwndOwner = owner;
-  ofn.lpstrFile = szFile;
-  ofn.nMaxFile = sizeof(szFile);
-  ofn.lpstrFilter = "JSON Files\0*.json\0All Files\0*.*\0";
-  ofn.nFilterIndex = 1;
-  ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-  if (GetOpenFileNameA(&ofn) == TRUE)
-    return std::string(ofn.lpstrFile);
-  return "";
-}
+    // 1. Setup GLFW
+    glfwSetErrorCallback(glfw_error_callback);
+    if (!glfwInit())
+        return 1;
 
-// --- DirectX Globals & Init (Same as before) ---
-static ID3D11Device *g_pd3dDevice = nullptr;
-static ID3D11DeviceContext *g_pd3dDeviceContext = nullptr;
-static IDXGISwapChain *g_pSwapChain = nullptr;
-static ID3D11RenderTargetView *g_mainRenderTargetView = nullptr;
+    // GL 3.0 + GLSL 130
+    const char* glsl_version = "#version 130";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-void CreateRenderTarget()
-{
-  ID3D11Texture2D *pBackBuffer;
-  g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-  g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_mainRenderTargetView);
-  pBackBuffer->Release();
-}
+    // Create window with graphics context
+    GLFWwindow* window = glfwCreateWindow(1000, 700, "Stock View", nullptr, nullptr);
+    if (window == nullptr)
+        return 1;
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // Enable vsync
 
-void CleanupRenderTarget()
-{
-  if (g_mainRenderTargetView)
-  {
-    g_mainRenderTargetView->Release();
-    g_mainRenderTargetView = nullptr;
-  }
-}
+    // 2. Setup Dear ImGui Context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImPlot::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-bool CreateDeviceD3D(HWND hWnd)
-{
-  DXGI_SWAP_CHAIN_DESC sd = {};
-  sd.BufferCount = 2;
-  sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-  sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-  sd.OutputWindow = hWnd;
-  sd.SampleDesc.Count = 1;
-  sd.Windowed = TRUE;
-  sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
 
-  D3D_FEATURE_LEVEL featureLevel;
-  const D3D_FEATURE_LEVEL featureLevelArray[2] = {D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0};
-  if (D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
-                                    featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain,
-                                    &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext) != S_OK)
-    return false;
+    // --- DPI SCALING MATH FOR LINUX ---
+    float xscale, yscale;
+    glfwGetWindowContentScale(window, &xscale, &yscale);
+    ImGui::GetIO().FontGlobalScale = xscale;
+    ImGui::GetStyle().ScaleAllSizes(xscale);
 
-  CreateRenderTarget();
-  return true;
-}
+    ConfigManager::GetInstance().Load();
+    Logger::GetInstance().Log("[SYSTEM] Application booted on Linux. Settings loaded.");
 
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    // 3. Initialize Architecture
+    StockModel model;
+    AppView view;
 
-LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-  if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-    return true;
-
-  // --- THE FIX: Tell DirectX to resize the canvas when the window resizes ---
-  if (msg == WM_SIZE)
-  {
-    if (g_pd3dDevice != nullptr && wParam != SIZE_MINIMIZED)
+    auto provider = std::make_shared<FinnhubProvider>();
+    DataService dataService(model, provider);
+    dataService.Start(); 
+    
+    auto& activeTickers = ConfigManager::GetInstance().GetSettings().activeTickers;
+    for (const std::string& ticker : activeTickers)
     {
-      CleanupRenderTarget();
-      g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, 0);
-      CreateRenderTarget();
+        dataService.EnqueueFetch(ticker, 0.0, TaskType::History);
     }
-    return 0;
-  }
+    
+    auto lastPoll = std::chrono::steady_clock::now() - std::chrono::seconds(5);
 
-  if (msg == WM_DESTROY)
-  {
-    PostQuitMessage(0);
-    return 0;
-  }
-
-  return DefWindowProc(hWnd, msg, wParam, lParam);
-}
-
-// --- Main Loop ---
-int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
-{
-  ImGui_ImplWin32_EnableDpiAwareness();
-  WNDCLASSEX wc = {sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0, 0, hInstance, nullptr, nullptr, nullptr, nullptr, _T("StockView"), nullptr};
-  RegisterClassEx(&wc);
-  HWND hwnd = CreateWindow(wc.lpszClassName, _T("Stock View"), WS_OVERLAPPEDWINDOW, 100, 100, 1000, 700, nullptr, nullptr, wc.hInstance, nullptr);
-  if (!CreateDeviceD3D(hwnd))
-    return 1;
-
-  ShowWindow(hwnd, SW_SHOWDEFAULT);
-  UpdateWindow(hwnd);
-
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImPlot::CreateContext();
-  ImGuiIO &io = ImGui::GetIO();
-  (void)io;
-  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-  ImGui_ImplWin32_Init(hwnd);
-  ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
-  // --- DPI SCALING MATH ---
-  // Query Windows for the monitor's DPI (96 is the standard 100% scale)
-  float dpiScale = GetDpiForWindow(hwnd) / 96.0f;
-
-  // 1. Scale all the text
-  ImGui::GetIO().FontGlobalScale = dpiScale;
-
-  // 2. Scale all the UI elements (padding, borders, scrollbars)
-  ImGui::GetStyle().ScaleAllSizes(dpiScale);
-
-  ConfigManager::GetInstance().Load();
-  Logger::GetInstance().Log("[SYSTEM] Application booted. Settings loaded.");
-
-  // 1. Initialize Architecture
-  StockModel model;
-  AppView view;
-
-  // Inject the Finnhub provider into our DataService
-  auto provider = std::make_shared<FinnhubProvider>();
-  DataService dataService(model, provider);
-  dataService.Start(); // Boot up the background worker thread
-  auto &activeTickers = ConfigManager::GetInstance().GetSettings().activeTickers;
-  // Backfill history for all saved tickers on startup
-  for (const std::string &ticker : activeTickers)
-  {
-    dataService.EnqueueFetch(ticker, 0.0, TaskType::History);
-  }
-  auto lastPoll = std::chrono::steady_clock::now() - std::chrono::seconds(5);
-  auto appStartTime = std::chrono::steady_clock::now();
-
-  bool done = false;
-  while (!done)
-  {
-    MSG msg;
-    while (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
+    // 4. Main Loop
+    while (!glfwWindowShouldClose(window))
     {
-      TranslateMessage(&msg);
-      DispatchMessage(&msg);
-      if (msg.message == WM_QUIT)
-        done = true;
-    }
-    if (done)
-      break;
+        glfwPollEvents();
 
-    auto now = std::chrono::steady_clock::now();
-    double currentAppTime = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+        auto now = std::chrono::steady_clock::now();
+        double currentAppTime = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+        float currentPollInterval = ConfigManager::GetInstance().GetSettings().pollingIntervalMs / 1000.0f;
 
-    // 2. Scheduler Logic: Just dump tasks into the queue!
-    // Get the live polling interval from the ConfigManager (convert ms to seconds)
-    float currentPollInterval = ConfigManager::GetInstance().GetSettings().pollingIntervalMs / 1000.0f;
-
-    if (std::chrono::duration<float>(now - lastPoll).count() >= currentPollInterval)
-    {
-      // Grab a snapshot of the current charts
-      auto currentStocks = model.GetStocks();
-
-      for (const std::string &ticker : activeTickers)
-      {
-        // SELF-HEALING LOGIC:
-        // If the chart doesn't exist yet, or it has 0 prices, queue a History task!
-        // Otherwise, just append the newest Live tick.
-        if (currentStocks.find(ticker) == currentStocks.end() || currentStocks[ticker].prices.empty())
+        if (std::chrono::duration<float>(now - lastPoll).count() >= currentPollInterval)
         {
-          dataService.EnqueueFetch(ticker, currentAppTime, TaskType::History);
+            auto currentStocks = model.GetStocks();
+            for (const std::string& ticker : activeTickers)
+            {
+                if (currentStocks.find(ticker) == currentStocks.end() || currentStocks[ticker].prices.empty())
+                {
+                    dataService.EnqueueFetch(ticker, currentAppTime, TaskType::History);
+                }
+                else
+                {
+                    dataService.EnqueueFetch(ticker, currentAppTime, TaskType::Live);
+                }
+            }
+            lastPoll = now;
         }
-        else
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // Render View & Handle Events
+        AppEvents events = view.Render(model.GetStocks(), model.HasApiError());
+
+        if (events.quit)
+            glfwSetWindowShouldClose(window, true);
+
+        if (events.saveRequested)
         {
-          dataService.EnqueueFetch(ticker, currentAppTime, TaskType::Live);
+            std::string path = OpenSaveFileDialog();
+            if (!path.empty()) HistoryStorage::Save(model.GetStocks(), path);
         }
-      }
-      lastPoll = now;
+        if (events.loadRequested)
+        {
+            std::string path = OpenLoadFileDialog();
+            if (!path.empty())
+            {
+                auto loadedData = HistoryStorage::Load(path);
+                if (!loadedData.empty()) model.LoadFromHistory(loadedData);
+            }
+        }
+
+        if (!events.addTicker.empty())
+        {
+            if (std::find(activeTickers.begin(), activeTickers.end(), events.addTicker) == activeTickers.end())
+            {
+                activeTickers.push_back(events.addTicker);
+                Logger::GetInstance().Log("[WATCHLIST] Added ticker: " + events.addTicker);
+                ConfigManager::GetInstance().Save();
+                dataService.EnqueueFetch(events.addTicker, currentAppTime, TaskType::History);
+            }
+        }
+
+        if (!events.removeTicker.empty())
+        {
+            activeTickers.erase(std::remove(activeTickers.begin(), activeTickers.end(), events.removeTicker), activeTickers.end());
+            Logger::GetInstance().Log("[WATCHLIST] Removed ticker: " + events.removeTicker);
+            model.RemoveStock(events.removeTicker);
+            ConfigManager::GetInstance().Save();
+        }
+
+        ImGui::Render();
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        glfwSwapBuffers(window);
     }
 
-    ImGui_ImplDX11_NewFrame();
-    ImGui_ImplWin32_NewFrame();
-    ImGui::NewFrame();
+    // 5. Clean Shutdown
+    dataService.Stop(); 
+    
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImPlot::DestroyContext();
+    ImGui::DestroyContext();
 
-    // 3. Render View & Handle Events
-    AppEvents events = view.Render(model.GetStocks(), model.HasApiError());
+    glfwDestroyWindow(window);
+    glfwTerminate();
 
-    if (events.quit)
-      done = true;
-
-    if (events.saveRequested)
-    {
-      std::string path = OpenSaveFileDialog(hwnd);
-      if (!path.empty())
-        HistoryStorage::Save(model.GetStocks(), path);
-    }
-    if (events.loadRequested)
-    {
-      std::string path = OpenLoadFileDialog(hwnd);
-      if (!path.empty())
-      {
-        auto loadedData = HistoryStorage::Load(path);
-        if (!loadedData.empty())
-          model.LoadFromHistory(loadedData);
-      }
-    }
-
-    if (!events.addTicker.empty())
-    {
-      if (std::find(activeTickers.begin(), activeTickers.end(), events.addTicker) == activeTickers.end())
-      {
-        activeTickers.push_back(events.addTicker);
-        Logger::GetInstance().Log("[WATCHLIST] Added ticker: " + events.addTicker);
-        ConfigManager::GetInstance().Save();
-
-        // Fetch the historical backfill immediately
-        dataService.EnqueueFetch(events.addTicker, currentAppTime, TaskType::History);
-      }
-    }
-
-    if (!events.removeTicker.empty())
-    {
-      activeTickers.erase(std::remove(activeTickers.begin(), activeTickers.end(), events.removeTicker), activeTickers.end());
-      Logger::GetInstance().Log("[WATCHLIST] Removed ticker: " + events.removeTicker);
-      model.RemoveStock(events.removeTicker);
-      ConfigManager::GetInstance().Save();
-    }
-
-    ImGui::Render();
-    const float clear_color[4] = {0.1f, 0.1f, 0.1f, 1.0f};
-    g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
-    g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color);
-    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-    g_pSwapChain->Present(1, 0);
-  }
-
-  // 4. Clean Shutdown
-  dataService.Stop(); // Safely close the worker thread before destroying resources
-
-  CleanupRenderTarget();
-  ImGui_ImplDX11_Shutdown();
-  ImGui_ImplWin32_Shutdown();
-  ImPlot::DestroyContext();
-  ImGui::DestroyContext();
-  return 0;
+    return 0;
 }

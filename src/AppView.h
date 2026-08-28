@@ -24,4 +24,5 @@ private:
   char m_tickerInput[16] = "";
   unsigned int m_centralNodeId = 0;
   bool m_showSettingsModal = false;
+  bool m_autoScrollConsole = true;
 };

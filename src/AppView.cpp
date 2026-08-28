@@ -136,20 +136,28 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   {
     Logger::GetInstance().Clear();
   }
+  
+  ImGui::SameLine();
+  ImGui::Checkbox("Auto-scroll", &m_autoScrollConsole); // --- NEW: Checkbox toggle ---
 
   ImGui::Separator();
+  
+  // Create a child window for the logs so scrolling is isolated
+  ImGui::BeginChild("ConsoleLogsRegion", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+
   // 1. Render all logs
   for (const std::string &log : Logger::GetInstance().GetLogs())
   {
     ImGui::TextUnformatted(log.c_str());
   }
 
-  // 2. Auto-scroll to the bottom when a new message arrives
-  if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+  // 2. Conditionally auto-scroll based on user preference
+  if (m_autoScrollConsole && (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
   {
     ImGui::SetScrollHereY(1.0f);
   }
 
+  ImGui::EndChild();
   ImGui::End();
 
   // --- CENTER: The Workspace Container ---
