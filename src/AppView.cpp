@@ -269,8 +269,6 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
 
       // 3. Render dynamically with zero branching
       renderers[currentStyle]->Render(symbol, data);
-      // 3. Render dynamically with zero branching
-      renderers[currentStyle]->Render(symbol, data);
 
       // 4. OVERLAY ALL ACTIVE INDICATORS
       if (settings.indicators.count(symbol))
