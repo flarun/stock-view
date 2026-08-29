@@ -116,7 +116,7 @@ public:
       curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
       // --- THE FIX: Disable strict SSL verification so Windows doesn't block it ---
-      curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+      curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
 
       CURLcode res = curl_easy_perform(curl);
       if (res != CURLE_OK)
