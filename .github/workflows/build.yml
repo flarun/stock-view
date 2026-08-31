@@ -1,46 +1,19 @@
-name: Build and Package
+name: Build and Distribute
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch: # This adds a manual "Run" button in GitHub!
+    branches: ["main"] # Runs every time you push to main
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        # These are the 3 servers GitHub will give you for free
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: windows-latest
 
     steps:
-      - name: Download Code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Linux Dependencies (Ubuntu Only)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcursor-dev libxi-dev libxrandr-dev libxinerama-dev libgl1-mesa-dev autoconf-archive pkg-config
-
       - name: Configure CMake
-        # GitHub automatically provides vcpkg via the $VCPKG_INSTALLATION_ROOT variable!
-        run: cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_INSTALLATION_ROOT }}/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Application
         run: cmake --build build --config Release
-
-      - name: Package App (.deb, .dmg, .zip)
-        run: |
-          cd build
-          cpack -C Release
-
-      - name: Upload Finished Installers
-        uses: actions/upload-artifact@v4
-        with:
-          name: StockView-${{ matrix.os }}
-          path: |
-            build/*.deb
-            build/*.dmg
-            build/*.zip
