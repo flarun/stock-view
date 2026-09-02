@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(stock_view)
-set(APP_VERSION "0.1.0-beta")
+set(APP_VERSION "0.1.1-beta")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

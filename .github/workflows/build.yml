@@ -9,6 +9,10 @@ jobs:
   release:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # --- ADD THESE TWO LINES ---
+    permissions:
+      contents: write
+    # ---------------------------
     strategy:
       fail-fast: false
       matrix:
