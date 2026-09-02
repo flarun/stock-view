@@ -75,7 +75,13 @@ int main(int, char **)
 #endif
 
   ConfigManager::GetInstance().Load();
+#if defined(__APPLE__)
+  Logger::GetInstance().Log("[SYSTEM] Application booted on macOS. Settings loaded.");
+#elif defined(_WIN32)
+  Logger::GetInstance().Log("[SYSTEM] Application booted on Windows. Settings loaded.");
+#else
   Logger::GetInstance().Log("[SYSTEM] Application booted on Linux. Settings loaded.");
+#endif
 
   // 3. Initialize Architecture
   StockModel model;

@@ -1,19 +1,47 @@
-name: Build and Distribute
+name: Build Cross-Platform Installers
 
 on:
   push:
-    branches: ["main"] # Runs every time you push to main
+    branches: [main]
+  workflow_dispatch: # Allows you to trigger this manually from the GitHub website
 
 jobs:
   build:
-    runs-on: windows-latest
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # If one OS fails, let the others finish
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        # Linux cloud servers need UI/graphics headers that Windows/Mac already have built-in
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxcursor-dev libxi-dev libxrandr-dev libxinerama-dev libgl1-mesa-dev pkg-config
+
       - name: Configure CMake
-        run: cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+        # We use GitHub's built-in VCPKG_INSTALLATION_ROOT to automatically handle the toolchain
+        run: cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_INSTALLATION_ROOT }}/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Application
         run: cmake --build build --config Release
+
+      - name: Package Application (CPack)
+        run: |
+          cd build
+          cpack -C Release
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockView-${{ matrix.os }}
+          path: |
+            build/*.deb
+            build/*.dmg
+            build/*.zip

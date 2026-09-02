@@ -37,3 +37,21 @@ target_link_libraries(stock_view PRIVATE
     glfw
     OpenGL::GL
 )
+
+# --- PACKAGING SETTINGS (CPack) ---
+# Tell CMake what exactly needs to be put inside the installer
+install(TARGETS stock_view DESTINATION bin)
+
+set(CPACK_PACKAGE_NAME "StockView")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+
+if(APPLE)
+    set(CPACK_GENERATOR "DragNDrop") # Creates a macOS .dmg file
+elseif(WIN32)
+    set(CPACK_GENERATOR "ZIP")       # Creates a Windows .zip containing the .exe
+else()
+    set(CPACK_GENERATOR "DEB")       # Creates a Linux .deb installer
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "flarun")
+endif()
+
+include(CPack)
