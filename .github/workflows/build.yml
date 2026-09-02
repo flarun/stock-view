@@ -3,14 +3,14 @@ name: Build Cross-Platform Installers
 on:
   push:
     branches: [main]
-  workflow_dispatch: # Allows you to trigger this manually from the GitHub website
+  workflow_dispatch:
 
 jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # If one OS fails, let the others finish
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
@@ -18,16 +18,19 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup MSVC Compiler (Windows Only)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install Linux Dependencies
         if: runner.os == 'Linux'
-        # Linux cloud servers need UI/graphics headers that Windows/Mac already have built-in
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcursor-dev libxi-dev libxrandr-dev libxinerama-dev libgl1-mesa-dev pkg-config
+          sudo apt-get install -y libx11-dev libxcursor-dev libxi-dev libxrandr-dev libxinerama-dev libgl1-mesa-dev pkg-config ninja-build autoconf autoconf-archive automake libtool
 
       - name: Configure CMake
-        # We use GitHub's built-in VCPKG_INSTALLATION_ROOT to automatically handle the toolchain
-        run: cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_INSTALLATION_ROOT }}/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+        shell: bash
+        run: cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Application
         run: cmake --build build --config Release
