@@ -1,12 +1,12 @@
-name: Build Cross-Platform Installers
+name: Build and Publish Release
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    tags:
+      - "v*" # This workflow ONLY runs when you push a tag starting with "v" (e.g., v0.1.0-beta)
 
 jobs:
-  build:
+  release:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -40,11 +40,24 @@ jobs:
           cd build
           cpack -C Release
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Generate SHA-256 Checksums
+        shell: bash
+        run: |
+          cd build
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            sha256sum *.zip > checksum-windows.sha256
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            shasum -a 256 *.dmg > checksum-macos.sha256
+          else
+            sha256sum *.deb > checksum-ubuntu.sha256
+          fi
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
         with:
-          name: StockView-${{ matrix.os }}
-          path: |
+          files: |
             build/*.deb
             build/*.dmg
             build/*.zip
+            build/*.sha256
+          generate_release_notes: true
