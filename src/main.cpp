@@ -48,7 +48,8 @@ int main(int, char **)
 #endif
 
   // Create window with graphics context
-  GLFWwindow *window = glfwCreateWindow(1000, 700, "Stock View", nullptr, nullptr);
+  std::string windowTitle = std::string("Stock View v") + APP_VERSION;
+  GLFWwindow *window = glfwCreateWindow(1000, 700, windowTitle.c_str(), nullptr, nullptr);
   if (window == nullptr)
     return 1;
   glfwMakeContextCurrent(window);

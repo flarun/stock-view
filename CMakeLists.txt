@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(stock_view)
+set(APP_VERSION "0.1.0-beta")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -38,12 +39,14 @@ target_link_libraries(stock_view PRIVATE
     OpenGL::GL
 )
 
+target_compile_definitions(stock_view PRIVATE APP_VERSION=\"${APP_VERSION}\")
+
 # --- PACKAGING SETTINGS (CPack) ---
 # Tell CMake what exactly needs to be put inside the installer
 install(TARGETS stock_view DESTINATION bin)
 
 set(CPACK_PACKAGE_NAME "StockView")
-set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_VERSION "${APP_VERSION}") # Now it updates automatically!
 
 if(APPLE)
     set(CPACK_GENERATOR "DragNDrop") # Creates a macOS .dmg file
