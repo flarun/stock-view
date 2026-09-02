@@ -1,45 +1,61 @@
 # Stock View
 
-A lightweight, high-performance real-time stock terminal built natively for Linux in C++ with OpenGL3, GLFW, Dear ImGui, and ImPlot.
+A lightweight, high-performance cross-platform real-time stock terminal built in C++ with OpenGL 3.2, GLFW, Dear ImGui, and ImPlot.
 
 ![Stock View Preview](preview/preview.png)
 
 ## Features
 
-- Dual-Fetch Architecture: Automatically backfills historical data (7-day hourly candles) upon adding a ticker, then seamlessly transitions to real-time live polling.
-- Resilient Networking: Background C++ worker thread utilizes a Token Bucket rate limiter, graceful API fallbacks, and self-healing polling loops to prevent rate limits or silent crashes.
-- Modular Technical Indicators: An extensible quantitative engine allowing users to stack, color-code, and customize indicators (like Simple Moving Averages) directly on the charts.
-- Advanced Charting: Interactive ImPlot graphs with pan, zoom, real-world time-axis scaling, and multiple rendering strategies (Line & Candlestick).
-- Live System Console: Real-time X-ray observability into network requests, API responses, and system events, now featuring automatic scrolling to keep the newest logs instantly in view.
-- Secure & Persistent: API keys and user workspace configurations are securely managed at runtime and serialized to a local JSON file (settings.json).
+- **Dual-Fetch Architecture:** Automatically backfills 7-day historical hourly candles on ticker addition, then seamlessly shifts to live polling.
+- **Resilient Networking:** Background worker thread featuring a Token Bucket rate limiter, API fallbacks, and self-healing polling loops.
+- **Modular Indicators:** Extensible quantitative engine allowing users to stack, color-code, and customize technical indicators (like SMA) directly on charts.
+- **Advanced Charting:** Interactive ImPlot graphs with pan, zoom, time-axis scaling, and multi-mode rendering (Line & Candlestick).
+- **Live System Console:** Real-time observability into network requests and system events with automatic scrolling.
+- **Persistent Workspace:** Secure local configuration and state management via `settings.json`.
 
 ## Tech Stack
 
-- Core: C++17, OpenGL3, GLFW
-- UI & Plotting: Dear ImGui (Docking Branch), ImPlot
-- Networking & Data: System libcurl, nlohmann_json
-- Build System: CMake, vcpkg
+- **Core:** C++17, OpenGL 3.2, GLFW
+- **UI & Plotting:** Dear ImGui (Docking Branch), ImPlot
+- **Networking & Data:** libcurl, nlohmann_json
+- **Build System:** CMake, vcpkg, Ninja
 
-## Prerequisites (Linux / Fedora)
+## Building from Source
 
-This project uses vcpkg for UI dependencies but relies on native system packages for networking and compilation. Before building, install the required development tools:
+Prerequisites: Ensure **CMake**, **Ninja**, and **vcpkg** are installed on your system.
 
-sudo dnf install gcc gcc-c++ make automake autoconf libtool autoconf-archive perl-FindBin perl-Thread-Queue openssl-devel libcurl-devel pkgconf-pkg-config
+## Linux (Fedora / Ubuntu)
 
-## Quick Start
+Install system dependencies (Fedora example):
+```
+sudo dnf install gcc gcc-c++ make automake autoconf libtool pkgconf-pkg-config openssl-devel libcurl-devel
+```
 
-### 1. Build the Application
-
-Ensure you have CMake and vcpkg installed, then run (replace the toolchain path with your local vcpkg path):
-
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=/home/youruser/vcpkg/scripts/buildsystems/vcpkg.cmake
+Configure and Build:
+```cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
+```
 
-### 2. Configure Your API Key
+## macOS
+```cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
 
-For security, API keys are no longer hardcoded into the source code.
+## Windows (Visual Studio / MSVC)
+Open a Developer Command Prompt and run:
+```cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
 
-1. Launch the application from your terminal: ./build/stock_view
-2. Navigate to File -> Settings -> API in the top menu bar.
-3. Paste your free Finnhub.io API key and click Close.
-4. Type a stock symbol (e.g., AAPL) into the Watchlist and click Add Ticker to begin streaming data!
+### Creating Native Installers (CPack)
+To bundle the application into a distribution package (`.deb` for Linux, `.dmg` for macOS, or `.zip` for Windows):
+```cd build
+cpack -C Release
+```
+
+## Quick Start & Configuration
+
+1. Launch the application (`./build/stock_view`).
+2. Navigate to **File -> Settings -> API** in the top menu bar.
+3. Paste your free Finnhub.io API key.
+4. Type a stock symbol (e.g., AAPL) into the Watchlist and click **Add Ticker** to begin streaming data!
