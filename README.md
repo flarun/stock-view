@@ -27,28 +27,35 @@ Prerequisites: Ensure **CMake**, **Ninja**, and **vcpkg** are installed on your 
 ## Linux (Fedora / Ubuntu)
 
 Install system dependencies (Fedora example):
+
 ```
 sudo dnf install gcc gcc-c++ make automake autoconf libtool pkgconf-pkg-config openssl-devel libcurl-devel
 ```
 
 Configure and Build:
+
 ```cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
 ## macOS
+
 ```cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
 ## Windows (Visual Studio / MSVC)
-Open a Developer Command Prompt and run:
-```cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+
+Open a Developer Command Prompt and run (adjust the path to where you installed vcpkg):
+
+```cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
 ### Creating Native Installers (CPack)
+
 To bundle the application into a distribution package (`.deb` for Linux, `.dmg` for macOS, or `.zip` for Windows):
+
 ```cd build
 cpack -C Release
 ```
