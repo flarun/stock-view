@@ -12,7 +12,7 @@ void StockModel::AddPrice(const std::string &symbol, double price, double time)
 
   // 2. Aggregate the OHLC Candlestick data
   auto &data = m_stocks[symbol];
-  const double BUCKET_SIZE = 5.0; // Changed to double
+  constexpr double BUCKET_SIZE = 5.0;
 
   if (data.candles.empty())
   {
