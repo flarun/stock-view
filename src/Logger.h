@@ -28,7 +28,7 @@ public:
     m_logs.push_back(ss.str());
 
     // Keep memory light by holding a maximum of 100 messages
-    if (m_logs.size() > 100)
+    if (m_logs.size() > MAX_LOGS)
     {
       m_logs.pop_front();
     }
@@ -50,4 +50,5 @@ private:
   Logger() = default;
   std::deque<std::string> m_logs;
   std::mutex m_mutex;
+  constexpr static size_t MAX_LOGS = 100;
 };
