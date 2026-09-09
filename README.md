@@ -34,13 +34,15 @@ sudo dnf install gcc gcc-c++ make automake autoconf libtool pkgconf-pkg-config o
 
 Configure and Build:
 
-```cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+```
+cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-## macOS
+## macOS (Universal Binary)
 
-```cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+```
+cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 cmake --build build --config Release
 ```
 
@@ -48,15 +50,17 @@ cmake --build build --config Release
 
 Open a Developer Command Prompt and run (adjust the path to where you installed vcpkg):
 
-```cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
+```
+cmake -B build -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
 ### Creating Native Installers (CPack)
 
-To bundle the application into a distribution package (`.deb` for Linux, `.dmg` for macOS, or `.zip` for Windows):
+To bundle the application into a distribution package (`.deb` for Linux, `.dmg` for macOS, or an NSIS setup installer for Windows):
 
-```cd build
+```
+cd build
 cpack -C Release
 ```
 

@@ -12,7 +12,8 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 
-add_executable(stock_view  
+# Base source files
+set(APP_SOURCES
     src/main.cpp
     src/AppView.cpp
     src/AppView.h
@@ -30,6 +31,25 @@ add_executable(stock_view
     src/Indicators.h
 )
 
+# --- PLATFORM SPECIFIC PACKAGING ---
+
+if(APPLE)
+    # Check if the file exists before trying to bundle it
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.icns")
+        set_source_files_properties(resources/app.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+        list(APPEND APP_SOURCES resources/app.icns)
+    else()
+        message(WARNING "app.icns not found! Building macOS bundle without a custom icon.")
+    endif()
+elseif(WIN32)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.rc")
+        list(APPEND APP_SOURCES resources/app.rc)
+    endif()
+endif()
+
+# We add MACOSX_BUNDLE to create a .app on Mac. (On other platforms, this flag is ignored).
+add_executable(stock_view MACOSX_BUNDLE ${APP_SOURCES})
+
 target_link_libraries(stock_view PRIVATE
     imgui::imgui
     implot::implot
@@ -41,20 +61,29 @@ target_link_libraries(stock_view PRIVATE
 
 target_compile_definitions(stock_view PRIVATE APP_VERSION=\"${APP_VERSION}\")
 
-# --- PACKAGING SETTINGS (CPack) ---
-# Tell CMake what exactly needs to be put inside the installer
-install(TARGETS stock_view DESTINATION bin)
-
-set(CPACK_PACKAGE_NAME "StockView")
-set(CPACK_PACKAGE_VERSION "${APP_VERSION}") # Now it updates automatically!
-
+# macOS Bundle Properties
 if(APPLE)
-    set(CPACK_GENERATOR "DragNDrop") # Creates a macOS .dmg file
-elseif(WIN32)
-    set(CPACK_GENERATOR "ZIP")       # Creates a Windows .zip containing the .exe
-else()
-    set(CPACK_GENERATOR "DEB")       # Creates a Linux .deb installer
-    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "flarun")
+    set_target_properties(stock_view PROPERTIES
+        MACOSX_BUNDLE_BUNDLE_NAME "StockView"
+        MACOSX_BUNDLE_ICON_FILE "app.icns"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${APP_VERSION}"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.flarun.stockview"
+    )
 endif()
 
-include(CPack)
+# --- INSTALLATION SETTINGS ---
+if(APPLE)
+    install(TARGETS stock_view BUNDLE DESTINATION .)
+else()
+    install(TARGETS stock_view DESTINATION bin)
+endif()
+
+# Linux specific desktop and icon installation (Made Optional)
+if(UNIX AND NOT APPLE)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/stock-view.desktop")
+        install(FILES resources/stock-view.desktop DESTINATION share/applications)
+    endif()
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.png")
+        install(FILES resources/app.png DESTINATION share/icons/hicolor/256x256/apps RENAME stock-view.png)
+    endif()
+endif()
