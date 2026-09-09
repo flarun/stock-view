@@ -49,7 +49,7 @@ jobs:
         run: |
           cd build
           if [ "$RUNNER_OS" == "Windows" ]; then
-            sha256sum *.zip > checksum-windows.sha256
+            sha256sum *.exe > checksum-windows.sha256  # <-- Changed to .exe
           elif [ "$RUNNER_OS" == "macOS" ]; then
             shasum -a 256 *.dmg > checksum-macos.sha256
           else
@@ -62,6 +62,6 @@ jobs:
           files: |
             build/*.deb
             build/*.dmg
-            build/*.zip
+            build/*.exe  # <-- Changed to .exe
             build/*.sha256
           generate_release_notes: true
