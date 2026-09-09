@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Stock View
-Comment=A real-time stock terminal
-Exec=stock_view
-Icon=stock-view
-Terminal=false
-Categories=Finance;Office;Utility;
