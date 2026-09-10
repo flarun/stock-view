@@ -10,6 +10,7 @@
     "nlohmann-json",
     "curl",
     "glfw3",
-    "ixwebsocket"
+    "ixwebsocket",
+    "nativefiledialog-extended"
   ]
 }

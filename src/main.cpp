@@ -8,6 +8,7 @@
 #include <vector>
 #include <chrono>
 #include <algorithm>
+#include <nfd.h>
 
 #include "StockModel.h"
 #include "AppView.h"
@@ -17,9 +18,36 @@
 #include "ConfigManager.h"
 #include "Logger.h"
 
-// --- Linux Save/Load Helpers (Simplified) ---
-std::string OpenSaveFileDialog() { return "stock_history.json"; }
-std::string OpenLoadFileDialog() { return "stock_history.json"; }
+// --- Native File Dialog Helpers ---
+std::string OpenSaveFileDialog()
+{
+  nfdchar_t *outPath = nullptr;
+  nfdfilteritem_t filterItem[1] = {{"JSON Workspace", "json"}};
+
+  nfdresult_t result = NFD_SaveDialog(&outPath, filterItem, 1, nullptr, "stock_history.json");
+  std::string res = "";
+  if (result == NFD_OKAY)
+  {
+    res = outPath;
+    NFD_FreePath(outPath);
+  }
+  return res;
+}
+
+std::string OpenLoadFileDialog()
+{
+  nfdchar_t *outPath = nullptr;
+  nfdfilteritem_t filterItem[1] = {{"JSON Workspace", "json"}};
+
+  nfdresult_t result = NFD_OpenDialog(&outPath, filterItem, 1, nullptr);
+  std::string res = "";
+  if (result == NFD_OKAY)
+  {
+    res = outPath;
+    NFD_FreePath(outPath);
+  }
+  return res;
+}
 
 static void glfw_error_callback(int error, const char *description)
 {
@@ -32,6 +60,9 @@ int main(int, char **)
   glfwSetErrorCallback(glfw_error_callback);
   if (!glfwInit())
     return 1;
+
+  // Initialize Native File Dialogs (REQUIRED)
+  NFD_Init();
 
 #if defined(__APPLE__)
   // GL 3.2 + GLSL 150 for macOS
@@ -132,7 +163,7 @@ int main(int, char **)
       }
     }
 
-    // --- NEW: Handle Timeframe Changes ---
+    // --- Handle Timeframe Changes ---
     if (!events.changeResolution.empty())
     {
       for (const std::string &ticker : activeTickers)
@@ -187,6 +218,9 @@ int main(int, char **)
   ImGui::DestroyContext();
 
   glfwDestroyWindow(window);
+
+  // Clean up Native File Dialogs (REQUIRED)
+  NFD_Quit();
   glfwTerminate();
 
   return 0;

@@ -1,10 +1,11 @@
 #include "ConfigManager.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <keychain/keychain.h> // <--- THE FIX: Explicitly target the nested subfolder
 
 using json = nlohmann::json;
 
-// JSON serializers for  modular config
+// JSON serializers for modular config
 inline void to_json(json &j, const IndicatorConfig &c)
 {
   j = json{{"type", static_cast<int>(c.type)}, {"period", c.period}, {"color", {c.color[0], c.color[1], c.color[2], c.color[3]}}};
@@ -32,18 +33,26 @@ void ConfigManager::Load()
       m_settings.chartStyle = static_cast<ChartStyle>(j["chartStyle"].get<int>());
     if (j.contains("pollingIntervalMs"))
       m_settings.pollingIntervalMs = j["pollingIntervalMs"].get<int>();
-    if (j.contains("apiKey"))
-      m_settings.apiKey = j["apiKey"].get<std::string>();
     if (j.contains("useLocalTime"))
       m_settings.useLocalTime = j["useLocalTime"].get<bool>();
     if (j.contains("use24HourClock"))
       m_settings.use24HourClock = j["use24HourClock"].get<bool>();
+    if (j.contains("historyResolution"))
+      m_settings.historyResolution = j["historyResolution"].get<std::string>();
     if (j.contains("activeTickers"))
       m_settings.activeTickers = j["activeTickers"].get<std::vector<std::string>>();
     if (j.contains("indicators"))
       m_settings.indicators = j["indicators"].get<std::unordered_map<std::string, std::vector<IndicatorConfig>>>();
-    if (j.contains("historyResolution"))
-      m_settings.historyResolution = j["historyResolution"].get<std::string>();
+
+    // Notice: We NO LONGER load the apiKey from the JSON file!
+  }
+
+  // --- SECURE KEYCHAIN LOAD ---
+  keychain::Error err;
+  std::string savedKey = keychain::getPassword("StockView", "finnhub_api", "default_user", err);
+  if (!err)
+  {
+    m_settings.apiKey = savedKey;
   }
 }
 
@@ -54,15 +63,24 @@ void ConfigManager::Save()
   j["pollingIntervalMs"] = m_settings.pollingIntervalMs;
   j["useLocalTime"] = m_settings.useLocalTime;
   j["use24HourClock"] = m_settings.use24HourClock;
+  j["historyResolution"] = m_settings.historyResolution;
   j["activeTickers"] = m_settings.activeTickers;
   j["indicators"] = m_settings.indicators;
-  j["apiKey"] = m_settings.apiKey;
-  j["historyResolution"] = m_settings.historyResolution;
 
   std::ofstream file(m_configFilePath);
   if (file.is_open())
   {
     file << j.dump(4);
   }
-  j["apiKey"] = m_settings.apiKey;
+
+  // --- SECURE KEYCHAIN SAVE ---
+  keychain::Error err;
+  if (!m_settings.apiKey.empty())
+  {
+    keychain::setPassword("StockView", "finnhub_api", "default_user", m_settings.apiKey, err);
+  }
+  else
+  {
+    keychain::deletePassword("StockView", "finnhub_api", "default_user", err);
+  }
 }

@@ -1,4 +1,5 @@
 #include <imgui.h>
+#include <imgui_internal.h> // NEW: Required for DockBuilder API
 #include <implot.h>
 #include <algorithm>
 #include <cstring>
@@ -20,23 +21,15 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
     if (ImGui::BeginMenu("File"))
     {
       if (ImGui::MenuItem("Settings..."))
-      {
         m_showSettingsModal = true;
-      }
       ImGui::Separator();
       if (ImGui::MenuItem("Save History"))
-      {
         events.saveRequested = true;
-      }
       if (ImGui::MenuItem("Load History"))
-      {
         events.loadRequested = true;
-      }
       ImGui::Separator();
       if (ImGui::MenuItem("Exit"))
-      {
         events.quit = true;
-      }
       ImGui::EndMenu();
     }
     float fps = ImGui::GetIO().Framerate;
@@ -46,26 +39,55 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
     ImGui::EndMainMenuBar();
   }
 
-  // Get the usable screen space
+  // --- NEW: FULLSCREEN ROOT DOCKSPACE ---
   ImGuiViewport *viewport = ImGui::GetMainViewport();
-  ImVec2 workPos = viewport->WorkPos;
-  ImVec2 workSize = viewport->WorkSize;
+  ImGui::SetNextWindowPos(viewport->WorkPos);
+  ImGui::SetNextWindowSize(viewport->WorkSize);
+  ImGui::SetNextWindowViewport(viewport->ID);
 
-  // Fixed sizes
-  float westWidth = 250.0f;
-  float eastWidth = 250.0f;
-  float southHeight = 120.0f;
+  // Lock this invisible root window to the edges of the screen
+  ImGuiWindowFlags host_window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+                                       ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                                       ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                       ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
 
-  // THE FIX: NoDocking + NoSavedSettings makes ImGui ignore imgui.ini entirely for these panels.
-  ImGuiWindowFlags panelFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-                                ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking |
-                                ImGuiWindowFlags_NoSavedSettings;
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
-  // --- WEST: Watchlist ---
-  ImGui::SetNextWindowPos(ImVec2(workPos.x, workPos.y), ImGuiCond_Always);
-  ImGui::SetNextWindowSize(ImVec2(westWidth, workSize.y - southHeight), ImGuiCond_Always);
-  ImGui::Begin("Watchlist", nullptr, panelFlags);
+  ImGui::Begin("MainRootWindow", nullptr, host_window_flags);
+  ImGui::PopStyleVar(3);
 
+  ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+  m_centralNodeId = dockspace_id; // Pass this to the charts later
+
+  // Build the layout mathematically on the very first boot (or if imgui.ini is deleted)
+  if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr)
+  {
+    ImGui::DockBuilderRemoveNode(dockspace_id); // Clear out existing layout
+    ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->WorkSize);
+
+    ImGuiID dock_main_id = dockspace_id;
+    // Split the dockspace into distinct zones
+    ImGuiID dock_id_west = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.20f, nullptr, &dock_main_id);
+    ImGuiID dock_id_east = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.20f, nullptr, &dock_main_id);
+    ImGuiID dock_id_south = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.25f, nullptr, &dock_main_id);
+
+    // Assign our windows to these specific zones
+    ImGui::DockBuilderDockWindow("Watchlist", dock_id_west);
+    ImGui::DockBuilderDockWindow("Details", dock_id_east);
+    ImGui::DockBuilderDockWindow("Console", dock_id_south);
+
+    ImGui::DockBuilderFinish(dockspace_id);
+  }
+
+  // Render the actual docking grid
+  ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+  ImGui::End();
+
+  // --- WEST: Watchlist (No manual positioning needed anymore!) ---
+  ImGui::Begin("Watchlist");
   ImGui::Text("Add New Stock:");
   ImGui::SetNextItemWidth(-FLT_MIN);
   ImGui::InputTextWithHint("##TickerInput", "Symbol", m_tickerInput, IM_ARRAYSIZE(m_tickerInput));
@@ -85,9 +107,7 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   {
     ImGui::PushID(symbol.c_str());
     if (ImGui::Button("X"))
-    {
       events.removeTicker = symbol;
-    }
     ImGui::SameLine();
     ImGui::Text("%s", symbol.c_str());
     ImGui::PopID();
@@ -95,13 +115,8 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   ImGui::End();
 
   // --- EAST: Details ---
-  ImGui::SetNextWindowPos(ImVec2(workPos.x + workSize.x - eastWidth, workPos.y), ImGuiCond_Always);
-  ImGui::SetNextWindowSize(ImVec2(eastWidth, workSize.y - southHeight), ImGuiCond_Always);
-  ImGui::Begin("Details", nullptr, panelFlags);
-
-  // --- Check API Key Status ---
+  ImGui::Begin("Details");
   std::string currentKey = ConfigManager::GetInstance().GetSettings().apiKey;
-
   if (currentKey.empty())
   {
     ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "API Status: MISSING KEY");
@@ -114,67 +129,38 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   }
   else if (stocks.empty())
   {
-    // The key is present, but we haven't made any network calls to prove it works yet
     ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "API Status: READY (Idle)");
   }
   else
   {
     ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "API Status: CONNECTED");
   }
-
   ImGui::Separator();
   ImGui::Text("Provider: Finnhub.io");
   ImGui::Text("Active Streams: %d", (int)stocks.size());
   ImGui::End();
 
   // --- SOUTH: Console/Footer ---
-  ImGui::SetNextWindowPos(ImVec2(workPos.x, workPos.y + workSize.y - southHeight), ImGuiCond_Always);
-  ImGui::SetNextWindowSize(ImVec2(workSize.x, southHeight), ImGuiCond_Always);
-  ImGui::Begin("Console", nullptr, panelFlags);
-
+  ImGui::Begin("Console");
   if (ImGui::Button("Clear Logs"))
-  {
     Logger::GetInstance().Clear();
-  }
-
   ImGui::SameLine();
-  ImGui::Checkbox("Auto-scroll", &m_autoScrollConsole); // --- NEW: Checkbox toggle ---
-
+  ImGui::Checkbox("Auto-scroll", &m_autoScrollConsole);
   ImGui::Separator();
-
-  // Create a child window for the logs so scrolling is isolated
   ImGui::BeginChild("ConsoleLogsRegion", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
-
-  // 1. Render all logs
   for (const std::string &log : Logger::GetInstance().GetLogs())
   {
     ImGui::TextUnformatted(log.c_str());
   }
-
-  // 2. Conditionally auto-scroll based on user preference
   if (m_autoScrollConsole && (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
   {
     ImGui::SetScrollHereY(1.0f);
   }
-
   ImGui::EndChild();
   ImGui::End();
 
-  // --- CENTER: The Workspace Container ---
-  ImGui::SetNextWindowPos(ImVec2(workPos.x + westWidth, workPos.y), ImGuiCond_Always);
-  ImGui::SetNextWindowSize(ImVec2(workSize.x - westWidth - eastWidth, workSize.y - southHeight), ImGuiCond_Always);
-
-  ImGuiWindowFlags centerFlags = panelFlags | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoBringToFrontOnFocus;
-  ImGui::Begin("WorkspaceArea", nullptr, centerFlags);
-
-  m_centralNodeId = ImGui::GetID("CenterDockSpace");
-  ImGui::DockSpace(m_centralNodeId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
-
-  ImGui::End();
-
-  // Render the charts
+  // Render the charts into the center area
   RenderWorkspace(stocks, events);
-
   RenderSettingsModal(events);
 
   return events;
@@ -182,14 +168,12 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
 
 void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &stocks, AppEvents &events)
 {
-  // 1. Get settings and apply global ImPlot styles
   auto &settings = ConfigManager::GetInstance().GetSettings();
   auto currentStyle = settings.chartStyle;
 
   ImPlot::GetStyle().UseLocalTime = settings.useLocalTime;
   ImPlot::GetStyle().Use24HourClock = settings.use24HourClock;
 
-  // 2. The Strategy Registry (Polymorphism in action)
   static std::unordered_map<ChartStyle, std::unique_ptr<IChartRenderer>> renderers;
   if (renderers.empty())
   {
@@ -201,6 +185,7 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
   {
     std::string windowName = symbol + " Chart";
 
+    // Auto-dock new charts to the center pane
     ImGui::SetNextWindowDockID(m_centralNodeId, ImGuiCond_FirstUseEver);
 
     bool isOpen = true;
@@ -220,7 +205,6 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
       }
     }
 
-    // --- INDICATOR ADD MENU ---
     if (ImGui::BeginPopup("IndicatorPopup"))
     {
       if (ImGui::MenuItem("Simple Moving Average (SMA)"))
@@ -231,7 +215,6 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
       ImGui::EndPopup();
     }
 
-    // --- INDICATOR EDITOR PANEL ---
     auto &activeIndicators = settings.indicators[symbol];
     for (int i = 0; i < activeIndicators.size(); ++i)
     {
@@ -239,16 +222,11 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
       ImGui::PushID(i);
       ImGui::SetNextItemWidth(80);
 
-      // Ensure you pass &ind.period here
       if (ImGui::InputInt("Period", &ind.period))
         ConfigManager::GetInstance().Save();
-
       ImGui::SameLine();
-
-      // Ensure you pass ind.color here
       if (ImGui::ColorEdit4("Color", ind.color, ImGuiColorEditFlags_NoInputs))
         ConfigManager::GetInstance().Save();
-
       ImGui::SameLine();
       if (ImGui::Button("X"))
       {
@@ -261,16 +239,11 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
     }
     if (ImPlot::BeginPlot(symbol.c_str(), ImVec2(-1, -1)))
     {
-      // Keep AutoFit on both axes, but remove the Time flag from here
       ImPlot::SetupAxes("Time", "Price ($)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-
-      // THE FIX: Tell ImPlot to scale the X-axis using real-world time!
       ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
 
-      // 3. Render dynamically with zero branching
       renderers[currentStyle]->Render(symbol, data);
 
-      // 4. OVERLAY ALL ACTIVE INDICATORS
       if (settings.indicators.count(symbol))
       {
         for (const auto &indConfig : settings.indicators[symbol])
@@ -342,7 +315,6 @@ void AppView::RenderSettingsModal(AppEvents &events)
         ImGui::Spacing();
         ImGui::Text("Time Formatting:");
 
-        // Map the boolean to a 0 or 1 for the Combo box
         int tzIndex = settings.useLocalTime ? 0 : 1;
         const char *tzItems[] = {"Local OS Time", "UTC (Coordinated Universal Time)"};
         if (ImGui::Combo("Timezone", &tzIndex, tzItems, IM_ARRAYSIZE(tzItems)))
@@ -358,16 +330,6 @@ void AppView::RenderSettingsModal(AppEvents &events)
         ImGui::EndTabItem();
       }
 
-      // TAB 2: NETWORK
-      if (ImGui::BeginTabItem("Network"))
-      {
-        ImGui::Spacing();
-        if (ImGui::SliderInt("Polling Rate (ms)", &settings.pollingIntervalMs, 1000, 10000))
-        {
-          settingsChanged = true;
-        }
-        ImGui::EndTabItem();
-      }
       // TAB 3: API
       if (ImGui::BeginTabItem("API"))
       {

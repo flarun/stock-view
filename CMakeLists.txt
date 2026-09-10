@@ -12,6 +12,17 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(ixwebsocket CONFIG REQUIRED)
+find_package(nfd CONFIG REQUIRED)
+
+# --- NEW: Fetch Keychain directly from GitHub ---
+include(FetchContent)
+FetchContent_Declare(
+  keychain
+  GIT_REPOSITORY https://github.com/hrantzsch/keychain.git
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(keychain)
+# ----------------------------------------------
 
 # Base source files
 set(APP_SOURCES
@@ -57,9 +68,11 @@ target_link_libraries(stock_view PRIVATE
     glfw
     OpenGL::GL
     ixwebsocket::ixwebsocket
+    nfd::nfd
+    keychain
 )
 
-target_compile_definitions(stock_view PRIVATE APP_VERSION=\"${APP_VERSION}\")
+target_compile_definitions(stock_view PRIVATE APP_VERSION=\"${APP_VERSION}\" GL_SILENCE_DEPRECATION)
 
 # macOS Bundle Properties
 if(APPLE)
