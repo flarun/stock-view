@@ -11,6 +11,7 @@ find_package(CURL REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
+find_package(ixwebsocket CONFIG REQUIRED)
 
 # Base source files
 set(APP_SOURCES
@@ -55,6 +56,7 @@ target_link_libraries(stock_view PRIVATE
     nlohmann_json::nlohmann_json
     glfw
     OpenGL::GL
+    ixwebsocket::ixwebsocket
 )
 
 target_compile_definitions(stock_view PRIVATE APP_VERSION=\"${APP_VERSION}\")

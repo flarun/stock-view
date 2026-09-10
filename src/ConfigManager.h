@@ -27,6 +27,7 @@ struct AppSettings
   std::string apiKey = "";
   bool useLocalTime = true;
   bool use24HourClock = false;
+  std::string historyResolution = "60";
   std::vector<std::string> activeTickers = {};
   std::unordered_map<std::string, std::vector<IndicatorConfig>> indicators;
 };

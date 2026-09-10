@@ -7,6 +7,8 @@
 #include <memory>
 #include "StockModel.h"
 #include "DataProvider.h"
+#include <ixwebsocket/IXNetSystem.h>
+#include <ixwebsocket/IXWebSocket.h>
 
 enum class TaskType
 {
@@ -33,11 +35,16 @@ public:
   // Updated to accept a task type
   void EnqueueFetch(const std::string &symbol, double appTime, TaskType type = TaskType::Live);
 
+  void Subscribe(const std::string &symbol);
+  void Unsubscribe(const std::string &symbol);
+
 private:
   void WorkerLoop();
 
   StockModel &m_model;
   std::shared_ptr<IDataProvider> m_provider;
+
+  ix::WebSocket m_webSocket;
 
   std::thread m_workerThread;
   std::mutex m_queueMutex;

@@ -9,6 +9,7 @@
     "implot",
     "nlohmann-json",
     "curl",
-    "glfw3"
+    "glfw3",
+    "ixwebsocket"
   ]
 }

@@ -136,12 +136,12 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   {
     Logger::GetInstance().Clear();
   }
-  
+
   ImGui::SameLine();
   ImGui::Checkbox("Auto-scroll", &m_autoScrollConsole); // --- NEW: Checkbox toggle ---
 
   ImGui::Separator();
-  
+
   // Create a child window for the logs so scrolling is isolated
   ImGui::BeginChild("ConsoleLogsRegion", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
@@ -175,7 +175,7 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   // Render the charts
   RenderWorkspace(stocks, events);
 
-  RenderSettingsModal();
+  RenderSettingsModal(events);
 
   return events;
 }
@@ -287,7 +287,7 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
   }
 }
 
-void AppView::RenderSettingsModal()
+void AppView::RenderSettingsModal(AppEvents &events)
 {
   if (m_showSettingsModal)
   {
@@ -316,6 +316,27 @@ void AppView::RenderSettingsModal()
         {
           settings.chartStyle = static_cast<ChartStyle>(currentChart);
           settingsChanged = true;
+        }
+        ImGui::Spacing();
+        ImGui::Text("Historical Data Timeframe:");
+        const char *resOptions[] = {"1", "5", "15", "30", "60", "D", "W", "M"};
+        const char *resLabels[] = {"1 Minute", "5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "Daily", "Weekly", "Monthly"};
+
+        int currentResIdx = 4; // Fallback default
+        for (int i = 0; i < 8; ++i)
+        {
+          if (settings.historyResolution == resOptions[i])
+          {
+            currentResIdx = i;
+            break;
+          }
+        }
+
+        if (ImGui::Combo("##Timeframe", &currentResIdx, resLabels, IM_ARRAYSIZE(resLabels)))
+        {
+          settings.historyResolution = resOptions[currentResIdx];
+          settingsChanged = true;
+          events.changeResolution = resOptions[currentResIdx];
         }
         ImGui::Separator();
         ImGui::Spacing();

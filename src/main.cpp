@@ -98,33 +98,12 @@ int main(int, char **)
     dataService.EnqueueFetch(ticker, 0.0, TaskType::History);
   }
 
-  auto lastPoll = std::chrono::steady_clock::now() - std::chrono::seconds(5);
-
   // 4. Main Loop
   while (!glfwWindowShouldClose(window))
   {
     glfwPollEvents();
 
-    auto now = std::chrono::steady_clock::now();
     double currentAppTime = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
-    float currentPollInterval = ConfigManager::GetInstance().GetSettings().pollingIntervalMs / 1000.0f;
-
-    if (std::chrono::duration<float>(now - lastPoll).count() >= currentPollInterval)
-    {
-      auto currentStocks = model.GetStocks();
-      for (const std::string &ticker : activeTickers)
-      {
-        if (currentStocks.find(ticker) == currentStocks.end() || currentStocks[ticker].prices.empty())
-        {
-          dataService.EnqueueFetch(ticker, currentAppTime, TaskType::History);
-        }
-        else
-        {
-          dataService.EnqueueFetch(ticker, currentAppTime, TaskType::Live);
-        }
-      }
-      lastPoll = now;
-    }
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -153,6 +132,16 @@ int main(int, char **)
       }
     }
 
+    // --- NEW: Handle Timeframe Changes ---
+    if (!events.changeResolution.empty())
+    {
+      for (const std::string &ticker : activeTickers)
+      {
+        model.RemoveStock(ticker);                                           // Wipe the old graph
+        dataService.EnqueueFetch(ticker, currentAppTime, TaskType::History); // Fetch new resolution
+      }
+    }
+
     if (!events.addTicker.empty())
     {
       if (std::find(activeTickers.begin(), activeTickers.end(), events.addTicker) == activeTickers.end())
@@ -160,7 +149,10 @@ int main(int, char **)
         activeTickers.push_back(events.addTicker);
         Logger::GetInstance().Log("[WATCHLIST] Added ticker: " + events.addTicker);
         ConfigManager::GetInstance().Save();
+
+        // Fetch historical background data, and instantly connect to the live WebSocket!
         dataService.EnqueueFetch(events.addTicker, currentAppTime, TaskType::History);
+        dataService.Subscribe(events.addTicker);
       }
     }
 
@@ -170,6 +162,9 @@ int main(int, char **)
       Logger::GetInstance().Log("[WATCHLIST] Removed ticker: " + events.removeTicker);
       model.RemoveStock(events.removeTicker);
       ConfigManager::GetInstance().Save();
+
+      // Stop receiving trades for this ticker
+      dataService.Unsubscribe(events.removeTicker);
     }
 
     ImGui::Render();

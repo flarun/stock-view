@@ -10,6 +10,7 @@ struct AppEvents
   bool loadRequested = false;
   std::string addTicker;
   std::string removeTicker;
+  std::string changeResolution;
 };
 
 class AppView
@@ -18,7 +19,7 @@ public:
   AppEvents Render(const std::unordered_map<std::string, StockData> &stocks, bool hasApiError);
 
 private:
-  void RenderSettingsModal();
+  void RenderSettingsModal(AppEvents &events);
   void RenderWorkspace(const std::unordered_map<std::string, StockData> &stocks, AppEvents &events);
 
   char m_tickerInput[16] = "";

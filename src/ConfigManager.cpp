@@ -42,6 +42,8 @@ void ConfigManager::Load()
       m_settings.activeTickers = j["activeTickers"].get<std::vector<std::string>>();
     if (j.contains("indicators"))
       m_settings.indicators = j["indicators"].get<std::unordered_map<std::string, std::vector<IndicatorConfig>>>();
+    if (j.contains("historyResolution"))
+      m_settings.historyResolution = j["historyResolution"].get<std::string>();
   }
 }
 
@@ -55,6 +57,7 @@ void ConfigManager::Save()
   j["activeTickers"] = m_settings.activeTickers;
   j["indicators"] = m_settings.indicators;
   j["apiKey"] = m_settings.apiKey;
+  j["historyResolution"] = m_settings.historyResolution;
 
   std::ofstream file(m_configFilePath);
   if (file.is_open())

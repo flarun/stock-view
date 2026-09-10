@@ -60,7 +60,7 @@ public:
   virtual double FetchPrice(const std::string &symbol) = 0;
 
   // NEW: History function
-  virtual HistoryChunk FetchHistory(const std::string &symbol, long long fromTime, long long toTime) = 0;
+  virtual HistoryChunk FetchHistory(const std::string &symbol, long long fromTime, long long toTime, const std::string &resolution) = 0;
 };
 
 // --- Finnhub Concrete Implementation ---
@@ -99,7 +99,7 @@ public:
     }
   }
 
-  HistoryChunk FetchHistory(const std::string &symbol, long long fromTime, long long toTime) override
+  HistoryChunk FetchHistory(const std::string &symbol, long long fromTime, long long toTime, const std::string &resolution) override
   {
     HistoryChunk chunk;
     CURL *curl = curl_easy_init();
@@ -110,7 +110,7 @@ public:
       if (apiKey.empty())
         return chunk;
 
-      std::string url = "https://finnhub.io/api/v1/stock/candle?symbol=" + symbol + "&resolution=60&from=" + std::to_string(fromTime) + "&to=" + std::to_string(toTime) + "&token=" + apiKey;
+      std::string url = "https://finnhub.io/api/v1/stock/candle?symbol=" + symbol + "&resolution=" + resolution + "&from=" + std::to_string(fromTime) + "&to=" + std::to_string(toTime) + "&token=" + apiKey;
       curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
       curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
       curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
