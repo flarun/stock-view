@@ -8,6 +8,7 @@
 #include <vector>
 #include <chrono>
 #include <algorithm>
+#include <filesystem> // Required for checking font paths
 #include <nfd.h>
 
 #include "StockModel.h"
@@ -61,7 +62,7 @@ int main(int, char **)
   if (!glfwInit())
     return 1;
 
-  // Initialize Native File Dialogs (REQUIRED)
+  // Initialize Native File Dialogs
   NFD_Init();
 
 #if defined(__APPLE__)
@@ -69,8 +70,8 @@ int main(int, char **)
   const char *glsl_version = "#version 150";
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // Required on Mac
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);           // Required on Mac
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #else
   // GL 3.0 + GLSL 130 for Linux/Windows
   const char *glsl_version = "#version 130";
@@ -94,6 +95,44 @@ int main(int, char **)
   (void)io;
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+  // --- SAFE FONT LOADER ---
+  ImFontConfig fontConfig;
+  fontConfig.OversampleH = 3;
+  fontConfig.OversampleV = 3;
+
+  // Check candidate paths depending on how the binary was executed
+  std::vector<std::string> fontCandidates = {
+      "resources/Roboto-Regular.ttf",
+      "../Resources/Roboto-Regular.ttf",
+      "../../resources/Roboto-Regular.ttf",
+      "../../../resources/Roboto-Regular.ttf",
+      "../../../../resources/Roboto-Regular.ttf"};
+
+  std::string validFontPath = "";
+  for (const auto &path : fontCandidates)
+  {
+    if (std::filesystem::exists(path))
+    {
+      validFontPath = path;
+      break;
+    }
+  }
+
+  if (!validFontPath.empty())
+  {
+    ImFont *mainFont = io.Fonts->AddFontFromFileTTF(validFontPath.c_str(), 16.0f, &fontConfig);
+    if (mainFont)
+    {
+      io.FontDefault = mainFont;
+      std::cout << "[SYSTEM] Loaded font: " << validFontPath << std::endl;
+    }
+  }
+  else
+  {
+    std::cerr << "[WARNING] Roboto-Regular.ttf not found. Falling back to default font.\n";
+    io.Fonts->AddFontDefault();
+  }
+
   // Setup Platform/Renderer backends
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init(glsl_version);
@@ -107,6 +146,13 @@ int main(int, char **)
 #endif
 
   ConfigManager::GetInstance().Load();
+
+  // 3. Initialize Architecture
+  StockModel model;
+  AppView view;
+
+  view.ApplyTheme(ConfigManager::GetInstance().GetSettings().theme);
+
 #if defined(__APPLE__)
   Logger::GetInstance().Log("[SYSTEM] Application booted on macOS. Settings loaded.");
 #elif defined(_WIN32)
@@ -114,10 +160,6 @@ int main(int, char **)
 #else
   Logger::GetInstance().Log("[SYSTEM] Application booted on Linux. Settings loaded.");
 #endif
-
-  // 3. Initialize Architecture
-  StockModel model;
-  AppView view;
 
   auto provider = std::make_shared<FinnhubProvider>();
   DataService dataService(model, provider);
@@ -163,13 +205,12 @@ int main(int, char **)
       }
     }
 
-    // --- Handle Timeframe Changes ---
     if (!events.changeResolution.empty())
     {
       for (const std::string &ticker : activeTickers)
       {
-        model.RemoveStock(ticker);                                           // Wipe the old graph
-        dataService.EnqueueFetch(ticker, currentAppTime, TaskType::History); // Fetch new resolution
+        model.RemoveStock(ticker);
+        dataService.EnqueueFetch(ticker, currentAppTime, TaskType::History);
       }
     }
 
@@ -180,8 +221,6 @@ int main(int, char **)
         activeTickers.push_back(events.addTicker);
         Logger::GetInstance().Log("[WATCHLIST] Added ticker: " + events.addTicker);
         ConfigManager::GetInstance().Save();
-
-        // Fetch historical background data, and instantly connect to the live WebSocket!
         dataService.EnqueueFetch(events.addTicker, currentAppTime, TaskType::History);
         dataService.Subscribe(events.addTicker);
       }
@@ -193,8 +232,6 @@ int main(int, char **)
       Logger::GetInstance().Log("[WATCHLIST] Removed ticker: " + events.removeTicker);
       model.RemoveStock(events.removeTicker);
       ConfigManager::GetInstance().Save();
-
-      // Stop receiving trades for this ticker
       dataService.Unsubscribe(events.removeTicker);
     }
 
@@ -202,7 +239,12 @@ int main(int, char **)
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
     glViewport(0, 0, display_w, display_h);
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+
+    if (ConfigManager::GetInstance().GetSettings().theme == AppTheme::Light)
+      glClearColor(0.9f, 0.9f, 0.9f, 1.0f);
+    else
+      glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -219,7 +261,6 @@ int main(int, char **)
 
   glfwDestroyWindow(window);
 
-  // Clean up Native File Dialogs (REQUIRED)
   NFD_Quit();
   glfwTerminate();
 

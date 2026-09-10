@@ -12,6 +12,13 @@ enum class IndicatorType
 {
   SMA
 };
+enum class AppTheme
+{
+  Dark,
+  Light,
+  Classic,
+  Nord
+};
 
 struct IndicatorConfig
 {
@@ -23,6 +30,7 @@ struct IndicatorConfig
 struct AppSettings
 {
   ChartStyle chartStyle = ChartStyle::Line;
+  AppTheme theme = AppTheme::Nord; // Defaults to the premium custom theme
   int pollingIntervalMs = 5000;
   std::string apiKey = "";
   bool useLocalTime = true;

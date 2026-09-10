@@ -1,5 +1,5 @@
 #include <imgui.h>
-#include <imgui_internal.h> // NEW: Required for DockBuilder API
+#include <imgui_internal.h>
 #include <implot.h>
 #include <algorithm>
 #include <cstring>
@@ -10,6 +10,56 @@
 #include "ChartRenderers.h"
 #include "Logger.h"
 #include "Indicators.h"
+
+void AppView::ApplyTheme(AppTheme theme)
+{
+  ImGuiStyle &style = ImGui::GetStyle();
+
+  switch (theme)
+  {
+  case AppTheme::Dark:
+    ImGui::StyleColorsDark();
+    break;
+  case AppTheme::Light:
+    ImGui::StyleColorsLight();
+    break;
+  case AppTheme::Classic:
+    ImGui::StyleColorsClassic();
+    break;
+  case AppTheme::Nord:
+  {
+    ImGui::StyleColorsDark(); // Base it on dark mode
+    ImVec4 *colors = style.Colors;
+    colors[ImGuiCol_WindowBg] = ImVec4(0.18f, 0.20f, 0.25f, 1.00f);
+    colors[ImGuiCol_ChildBg] = ImVec4(0.15f, 0.17f, 0.21f, 1.00f);
+    colors[ImGuiCol_PopupBg] = ImVec4(0.18f, 0.20f, 0.25f, 1.00f);
+    colors[ImGuiCol_Border] = ImVec4(0.26f, 0.30f, 0.36f, 1.00f);
+    colors[ImGuiCol_FrameBg] = ImVec4(0.15f, 0.17f, 0.21f, 1.00f);
+    colors[ImGuiCol_FrameBgHovered] = ImVec4(0.23f, 0.26f, 0.32f, 1.00f);
+    colors[ImGuiCol_FrameBgActive] = ImVec4(0.33f, 0.38f, 0.47f, 1.00f);
+    colors[ImGuiCol_TitleBg] = ImVec4(0.15f, 0.17f, 0.21f, 1.00f);
+    colors[ImGuiCol_TitleBgActive] = ImVec4(0.23f, 0.26f, 0.32f, 1.00f);
+    colors[ImGuiCol_Button] = ImVec4(0.33f, 0.38f, 0.47f, 1.00f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(0.40f, 0.45f, 0.55f, 1.00f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(0.50f, 0.55f, 0.65f, 1.00f);
+    colors[ImGuiCol_Header] = ImVec4(0.33f, 0.38f, 0.47f, 1.00f);
+    colors[ImGuiCol_HeaderHovered] = ImVec4(0.40f, 0.45f, 0.55f, 1.00f);
+    colors[ImGuiCol_HeaderActive] = ImVec4(0.50f, 0.55f, 0.65f, 1.00f);
+    colors[ImGuiCol_Tab] = ImVec4(0.15f, 0.17f, 0.21f, 1.00f);
+    colors[ImGuiCol_TabHovered] = ImVec4(0.33f, 0.38f, 0.47f, 1.00f);
+    colors[ImGuiCol_TabActive] = ImVec4(0.23f, 0.26f, 0.32f, 1.00f);
+
+    // Modernize the geometry
+    style.WindowRounding = 6.0f;
+    style.ChildRounding = 4.0f;
+    style.FrameRounding = 4.0f;
+    style.PopupRounding = 4.0f;
+    style.GrabRounding = 4.0f;
+    style.TabRounding = 4.0f;
+    break;
+  }
+  }
+}
 
 AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stocks, bool hasApiError)
 {
@@ -39,13 +89,12 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
     ImGui::EndMainMenuBar();
   }
 
-  // --- NEW: FULLSCREEN ROOT DOCKSPACE ---
+  // --- FULLSCREEN ROOT DOCKSPACE ---
   ImGuiViewport *viewport = ImGui::GetMainViewport();
   ImGui::SetNextWindowPos(viewport->WorkPos);
   ImGui::SetNextWindowSize(viewport->WorkSize);
   ImGui::SetNextWindowViewport(viewport->ID);
 
-  // Lock this invisible root window to the edges of the screen
   ImGuiWindowFlags host_window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
                                        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                                        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBringToFrontOnFocus |
@@ -59,22 +108,19 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   ImGui::PopStyleVar(3);
 
   ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
-  m_centralNodeId = dockspace_id; // Pass this to the charts later
+  m_centralNodeId = dockspace_id;
 
-  // Build the layout mathematically on the very first boot (or if imgui.ini is deleted)
   if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr)
   {
-    ImGui::DockBuilderRemoveNode(dockspace_id); // Clear out existing layout
+    ImGui::DockBuilderRemoveNode(dockspace_id);
     ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->WorkSize);
 
     ImGuiID dock_main_id = dockspace_id;
-    // Split the dockspace into distinct zones
     ImGuiID dock_id_west = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.20f, nullptr, &dock_main_id);
     ImGuiID dock_id_east = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.20f, nullptr, &dock_main_id);
     ImGuiID dock_id_south = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.25f, nullptr, &dock_main_id);
 
-    // Assign our windows to these specific zones
     ImGui::DockBuilderDockWindow("Watchlist", dock_id_west);
     ImGui::DockBuilderDockWindow("Details", dock_id_east);
     ImGui::DockBuilderDockWindow("Console", dock_id_south);
@@ -82,11 +128,10 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
     ImGui::DockBuilderFinish(dockspace_id);
   }
 
-  // Render the actual docking grid
   ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
   ImGui::End();
 
-  // --- WEST: Watchlist (No manual positioning needed anymore!) ---
+  // --- WEST: Watchlist ---
   ImGui::Begin("Watchlist");
   ImGui::Text("Add New Stock:");
   ImGui::SetNextItemWidth(-FLT_MIN);
@@ -185,7 +230,6 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
   {
     std::string windowName = symbol + " Chart";
 
-    // Auto-dock new charts to the center pane
     ImGui::SetNextWindowDockID(m_centralNodeId, ImGuiCond_FirstUseEver);
 
     bool isOpen = true;
@@ -290,12 +334,23 @@ void AppView::RenderSettingsModal(AppEvents &events)
           settings.chartStyle = static_cast<ChartStyle>(currentChart);
           settingsChanged = true;
         }
+
+        // --- THEME SELECTOR ---
+        int currentTheme = static_cast<int>(settings.theme);
+        const char *themeItems[] = {"Dark", "Light", "Classic", "Nord (Premium)"};
+        if (ImGui::Combo("Application Theme", &currentTheme, themeItems, IM_ARRAYSIZE(themeItems)))
+        {
+          settings.theme = static_cast<AppTheme>(currentTheme);
+          ApplyTheme(settings.theme); // Instantly apply the theme!
+          settingsChanged = true;
+        }
+
         ImGui::Spacing();
         ImGui::Text("Historical Data Timeframe:");
         const char *resOptions[] = {"1", "5", "15", "30", "60", "D", "W", "M"};
         const char *resLabels[] = {"1 Minute", "5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "Daily", "Weekly", "Monthly"};
 
-        int currentResIdx = 4; // Fallback default
+        int currentResIdx = 4;
         for (int i = 0; i < 8; ++i)
         {
           if (settings.historyResolution == resOptions[i])

@@ -51,6 +51,12 @@ if(APPLE)
     else()
         message(WARNING "app.icns not found! Building macOS bundle without a custom icon.")
     endif()
+    
+    # NEW: Bundle the font directly into the macOS app
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/Roboto-Regular.ttf")
+        set_source_files_properties(resources/Roboto-Regular.ttf PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+        list(APPEND APP_SOURCES resources/Roboto-Regular.ttf)
+    endif()
 elseif(WIN32)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.rc")
         list(APPEND APP_SOURCES resources/app.rc)
@@ -59,6 +65,13 @@ endif()
 
 # We add MACOSX_BUNDLE to create a .app on Mac. (Ignored on Windows/Linux)
 add_executable(stock_view MACOSX_BUNDLE ${APP_SOURCES})
+
+# NEW: Automatically copy resources next to the executable on every build
+add_custom_command(TARGET stock_view POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_CURRENT_SOURCE_DIR}/resources"
+    "$<TARGET_FILE_DIR:stock_view>/resources"
+)
 
 target_link_libraries(stock_view PRIVATE
     imgui::imgui

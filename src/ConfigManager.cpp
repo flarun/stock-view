@@ -1,7 +1,7 @@
 #include "ConfigManager.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
-#include <keychain/keychain.h> // <--- THE FIX: Explicitly target the nested subfolder
+#include <keychain/keychain.h>
 
 using json = nlohmann::json;
 
@@ -31,6 +31,8 @@ void ConfigManager::Load()
     file >> j;
     if (j.contains("chartStyle"))
       m_settings.chartStyle = static_cast<ChartStyle>(j["chartStyle"].get<int>());
+    if (j.contains("theme"))
+      m_settings.theme = static_cast<AppTheme>(j["theme"].get<int>());
     if (j.contains("pollingIntervalMs"))
       m_settings.pollingIntervalMs = j["pollingIntervalMs"].get<int>();
     if (j.contains("useLocalTime"))
@@ -43,8 +45,6 @@ void ConfigManager::Load()
       m_settings.activeTickers = j["activeTickers"].get<std::vector<std::string>>();
     if (j.contains("indicators"))
       m_settings.indicators = j["indicators"].get<std::unordered_map<std::string, std::vector<IndicatorConfig>>>();
-
-    // Notice: We NO LONGER load the apiKey from the JSON file!
   }
 
   // --- SECURE KEYCHAIN LOAD ---
@@ -60,6 +60,7 @@ void ConfigManager::Save()
 {
   json j;
   j["chartStyle"] = static_cast<int>(m_settings.chartStyle);
+  j["theme"] = static_cast<int>(m_settings.theme);
   j["pollingIntervalMs"] = m_settings.pollingIntervalMs;
   j["useLocalTime"] = m_settings.useLocalTime;
   j["use24HourClock"] = m_settings.use24HourClock;

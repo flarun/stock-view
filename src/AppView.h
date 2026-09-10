@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <string>
 #include "StockModel.h"
+#include "ConfigManager.h" // Needed for AppTheme enum
 
 struct AppEvents
 {
@@ -16,6 +17,7 @@ struct AppEvents
 class AppView
 {
 public:
+  void ApplyTheme(AppTheme theme);
   AppEvents Render(const std::unordered_map<std::string, StockData> &stocks, bool hasApiError);
 
 private:

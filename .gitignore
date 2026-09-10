@@ -43,6 +43,9 @@ imgui.ini
 # Script Dumps
 project_dump.txt
 
+# macos garbage
+.DS_Store
+
 # --- SECURITY ---
 # Never commit the local user settings/API keys!
 settings.json
