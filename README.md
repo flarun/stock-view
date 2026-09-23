@@ -27,7 +27,7 @@ A lightweight, high-performance cross-platform real-time stock terminal built in
 
 Prerequisites: Ensure **CMake**, **Ninja**, and **vcpkg** are installed on your system.
 
-### Linux (Fedora / Ubuntu)
+### Linux (Fedora / Ubuntu / Debian)
 
 Install system dependencies (Fedora example):
 
