@@ -2,6 +2,7 @@
 #include "IChartRenderer.h"
 #include <implot.h>
 #include <algorithm>
+#include <cmath> // Required for -INFINITY
 
 class LineChartRenderer : public IChartRenderer
 {
@@ -10,6 +11,10 @@ public:
   {
     if (data.prices.size() > 1)
     {
+      // 1. Draw the shaded area (ImPlot automatically applies a transparent alpha fill by default!)
+      ImPlot::PlotShaded(symbol.c_str(), data.timeAxis.data(), data.prices.data(), (int)data.prices.size(), -INFINITY);
+
+      // 2. Draw the solid line exactly on top
       ImPlot::PlotLine(symbol.c_str(), data.timeAxis.data(), data.prices.data(), (int)data.prices.size());
     }
   }
