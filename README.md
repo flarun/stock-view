@@ -61,4 +61,4 @@ To bundle the application into a distribution package (`.deb` for Linux, `.dmg` 
 
 1. Launch the application (`./build/stock_view`).
 2. Navigate to **File -> Settings** in the top menu bar to select your preferred theme or configure your Finnhub API Key.
-3. Type a stock symbol (e.g., AAPL) into the Watchlist and click **Add Ticker** to begin live streaming data!
+3. Type a stock symbol (e.g., AAPL) into the Watchlist and click **Add Ticker** to begin live streaming data.
