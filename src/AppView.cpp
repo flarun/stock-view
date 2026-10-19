@@ -281,7 +281,9 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
       }
       ImGui::PopID();
     }
-    if (ImPlot::BeginPlot(symbol.c_str(), ImVec2(-1, -1)))
+    
+    // --- THE FIX: Added ImPlotFlags_Crosshairs ---[cite: 7]
+    if (ImPlot::BeginPlot(symbol.c_str(), ImVec2(-1, -1), ImPlotFlags_Crosshairs))
     {
       ImPlot::SetupAxes("Time", "Price ($)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
       ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
