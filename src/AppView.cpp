@@ -148,7 +148,9 @@ AppEvents AppView::Render(const std::unordered_map<std::string, StockData> &stoc
   }
   ImGui::Separator();
   ImGui::Text("Active Tickers:");
-  for (const auto &[symbol, data] : stocks)
+  // Iterate the ordered watchlist (not the unordered data map) so tickers
+  // keep a stable order and failed fetches can still be removed.
+  for (const std::string &symbol : ConfigManager::GetInstance().GetSettings().activeTickers)
   {
     ImGui::PushID(symbol.c_str());
     if (ImGui::Button("X"))
@@ -260,14 +262,17 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
     }
 
     auto &activeIndicators = settings.indicators[symbol];
-    for (int i = 0; i < activeIndicators.size(); ++i)
+    for (int i = 0; i < (int)activeIndicators.size(); ++i)
     {
       auto &ind = activeIndicators[i];
       ImGui::PushID(i);
       ImGui::SetNextItemWidth(80);
 
       if (ImGui::InputInt("Period", &ind.period))
+      {
+        ind.period = std::max(1, ind.period); // period <= 0 would break the SMA math
         ConfigManager::GetInstance().Save();
+      }
       ImGui::SameLine();
       if (ImGui::ColorEdit4("Color", ind.color, ImGuiColorEditFlags_NoInputs))
         ConfigManager::GetInstance().Save();
@@ -281,8 +286,7 @@ void AppView::RenderWorkspace(const std::unordered_map<std::string, StockData> &
       }
       ImGui::PopID();
     }
-    
-    // --- THE FIX: Added ImPlotFlags_Crosshairs ---[cite: 7]
+
     if (ImPlot::BeginPlot(symbol.c_str(), ImVec2(-1, -1), ImPlotFlags_Crosshairs))
     {
       ImPlot::SetupAxes("Time", "Price ($)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
@@ -387,7 +391,7 @@ void AppView::RenderSettingsModal(AppEvents &events)
         ImGui::EndTabItem();
       }
 
-      // TAB 3: API
+      // TAB 2: API
       if (ImGui::BeginTabItem("API"))
       {
         ImGui::Spacing();
@@ -407,6 +411,7 @@ void AppView::RenderSettingsModal(AppEvents &events)
 
         ImGui::Spacing();
         ImGui::TextDisabled("Get a free API key at finnhub.io");
+        ImGui::TextDisabled("Restart the app after changing the key.");
         ImGui::EndTabItem();
       }
       ImGui::EndTabBar();

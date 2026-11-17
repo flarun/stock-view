@@ -44,7 +44,7 @@ private:
   std::mutex m_mutex;
 };
 
-// NEW: Struct to hold historical batches
+// Struct to hold historical batches
 struct HistoryChunk
 {
   std::vector<double> timestamps;
@@ -58,8 +58,6 @@ public:
   virtual ~IDataProvider() = default;
   virtual bool CanFetch() = 0;
   virtual double FetchPrice(const std::string &symbol) = 0;
-
-  // NEW: History function
   virtual HistoryChunk FetchHistory(const std::string &symbol, long long fromTime, long long toTime, const std::string &resolution) = 0;
 };
 
@@ -73,21 +71,16 @@ public:
 
   double FetchPrice(const std::string &symbol) override
   {
-    CURL *curl = curl_easy_init();
+    // Check the key BEFORE allocating the curl handle (avoids a leak)
+    std::string apiKey = ConfigManager::GetInstance().GetSettings().apiKey;
+    if (apiKey.empty())
+      return -1.0;
+
     std::string response;
-    if (curl)
-    {
-      std::string apiKey = ConfigManager::GetInstance().GetSettings().apiKey;
-      if (apiKey.empty())
-        return -1.0;
-      std::string url = "https://finnhub.io/api/v1/quote?symbol=" + symbol + "&token=" + apiKey;
-      curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-      curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-      curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-      CURLcode res = curl_easy_perform(curl);
-      curl_easy_cleanup(curl);
-    }
+    std::string url = "https://finnhub.io/api/v1/quote?symbol=" + symbol + "&token=" + apiKey;
+    if (!Perform(url, response))
+      return -1.0;
+
     try
     {
       auto j = nlohmann::json::parse(response);
@@ -102,29 +95,14 @@ public:
   HistoryChunk FetchHistory(const std::string &symbol, long long fromTime, long long toTime, const std::string &resolution) override
   {
     HistoryChunk chunk;
-    CURL *curl = curl_easy_init();
+
+    std::string apiKey = ConfigManager::GetInstance().GetSettings().apiKey;
+    if (apiKey.empty())
+      return chunk;
+
     std::string response;
-    if (curl)
-    {
-      std::string apiKey = ConfigManager::GetInstance().GetSettings().apiKey;
-      if (apiKey.empty())
-        return chunk;
-
-      std::string url = "https://finnhub.io/api/v1/stock/candle?symbol=" + symbol + "&resolution=" + resolution + "&from=" + std::to_string(fromTime) + "&to=" + std::to_string(toTime) + "&token=" + apiKey;
-      curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-      curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-
-      // --- THE FIX: Disable strict SSL verification so Windows doesn't block it ---
-      curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-
-      CURLcode res = curl_easy_perform(curl);
-      if (res != CURLE_OK)
-      {
-        Logger::GetInstance().Log(std::string("[ERROR] CURL Network failure: ") + curl_easy_strerror(res));
-      }
-      curl_easy_cleanup(curl);
-    }
+    std::string url = "https://finnhub.io/api/v1/stock/candle?symbol=" + symbol + "&resolution=" + resolution + "&from=" + std::to_string(fromTime) + "&to=" + std::to_string(toTime) + "&token=" + apiKey;
+    Perform(url, response);
 
     try
     {
@@ -139,7 +117,7 @@ public:
         }
         else
         {
-          // --- X-RAY LOGGING: Tell the console EXACTLY what Finnhub said ---
+          // Tell the console EXACTLY what Finnhub said
           Logger::GetInstance().Log("[API RESPONSE] " + response);
         }
       }
@@ -152,6 +130,32 @@ public:
   }
 
 private:
+  // Shared GET helper: always cleans up the curl handle
+  bool Perform(const std::string &url, std::string &response)
+  {
+    CURL *curl = curl_easy_init();
+    if (!curl)
+      return false;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    // Use the OS certificate store (fixes SSL failures on Windows) without disabling verification
+    curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK)
+    {
+      Logger::GetInstance().Log(std::string("[ERROR] CURL Network failure: ") + curl_easy_strerror(res));
+      return false;
+    }
+    return true;
+  }
+
   static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
   {
     ((std::string *)userp)->append((char *)contents, size * nmemb);

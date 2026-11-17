@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <memory>
+#include <unordered_set>
 #include "StockModel.h"
 #include "DataProvider.h"
 #include <ixwebsocket/IXNetSystem.h>
@@ -40,6 +41,7 @@ public:
 
 private:
   void WorkerLoop();
+  bool IsActive(const std::string &symbol);
 
   StockModel &m_model;
   std::shared_ptr<IDataProvider> m_provider;
@@ -51,4 +53,8 @@ private:
   std::condition_variable m_cv;
   std::queue<FetchTask> m_queue;
   std::atomic<bool> m_running{false};
+
+  // Tickers currently on the watchlist; used to drop late data for removed tickers
+  std::unordered_set<std::string> m_active;
+  std::mutex m_activeMutex;
 };

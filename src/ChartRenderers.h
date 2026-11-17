@@ -37,8 +37,8 @@ public:
     // Grab the raw graphics canvas
     ImDrawList *draw_list = ImPlot::GetPlotDrawList();
 
-    // Define the visual width of the candle body
-    const float half_width = 2.0f;
+    // Constant pixel half-width so candles stay visible at any zoom level
+    const float half_px = 3.0f;
 
     for (const auto &candle : data.candles)
     {
@@ -48,8 +48,10 @@ public:
       // Convert abstract plot math (Time, Price) into literal screen pixels
       ImVec2 p_low = ImPlot::PlotToPixels(candle.time, candle.low);
       ImVec2 p_high = ImPlot::PlotToPixels(candle.time, candle.high);
-      ImVec2 p_open = ImPlot::PlotToPixels(candle.time - half_width, candle.open);
-      ImVec2 p_close = ImPlot::PlotToPixels(candle.time + half_width, candle.close);
+      ImVec2 p_open = ImPlot::PlotToPixels(candle.time, candle.open);
+      ImVec2 p_close = ImPlot::PlotToPixels(candle.time, candle.close);
+      p_open.x -= half_px;
+      p_close.x += half_px;
 
       // 1. Draw the vertical Wick
       draw_list->AddLine(p_low, p_high, color, 1.0f);

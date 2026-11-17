@@ -10,6 +10,12 @@ DataService::~DataService()
   Stop();
 }
 
+bool DataService::IsActive(const std::string &symbol)
+{
+  std::lock_guard<std::mutex> lock(m_activeMutex);
+  return m_active.count(symbol) > 0;
+}
+
 void DataService::Start()
 {
   if (!m_running)
@@ -29,7 +35,7 @@ void DataService::Start()
                                        {
             if (msg->type == ix::WebSocketMessageType::Open) {
                 Logger::GetInstance().Log("[WEBSOCKET] Connected to Finnhub Live Stream.");
-                
+
                 // Automatically resubscribe to all active tickers on connect
                 auto active = ConfigManager::GetInstance().GetSettings().activeTickers;
                 for (const auto& t : active) {
@@ -43,7 +49,8 @@ void DataService::Start()
                             std::string sym = trade["s"];
                             double price = trade["p"];
                             double time = trade["t"].get<double>() / 1000.0; // Convert UNIX ms to seconds
-                            m_model.AddPrice(sym, price, time);
+                            if (IsActive(sym))
+                                m_model.AddPrice(sym, price, time);
                         }
                     }
                 } catch(...) {}
@@ -72,12 +79,20 @@ void DataService::Stop()
 
 void DataService::Subscribe(const std::string &symbol)
 {
+  {
+    std::lock_guard<std::mutex> lock(m_activeMutex);
+    m_active.insert(symbol);
+  }
   nlohmann::json j = {{"type", "subscribe"}, {"symbol", symbol}};
   m_webSocket.send(j.dump());
 }
 
 void DataService::Unsubscribe(const std::string &symbol)
 {
+  {
+    std::lock_guard<std::mutex> lock(m_activeMutex);
+    m_active.erase(symbol);
+  }
   nlohmann::json j = {{"type", "unsubscribe"}, {"symbol", symbol}};
   m_webSocket.send(j.dump());
 }
@@ -85,11 +100,17 @@ void DataService::Unsubscribe(const std::string &symbol)
 void DataService::EnqueueFetch(const std::string &symbol, double appTime, TaskType type)
 {
   {
+    // Mark active so startup/resolution-change history isn't dropped
+    std::lock_guard<std::mutex> lock(m_activeMutex);
+    m_active.insert(symbol);
+  }
+  {
     std::lock_guard<std::mutex> lock(m_queueMutex);
     m_queue.push({symbol, appTime, type});
   }
   m_cv.notify_one();
 }
+
 void DataService::WorkerLoop()
 {
   while (m_running)
@@ -104,6 +125,10 @@ void DataService::WorkerLoop()
       task = m_queue.front();
       m_queue.pop();
     }
+
+    // Ticker was removed while the task was waiting in the queue
+    if (!IsActive(task.symbol))
+      continue;
 
     if (m_provider->CanFetch())
     {
@@ -120,14 +145,16 @@ void DataService::WorkerLoop()
         if (!chunk.prices.empty())
         {
           m_model.SetApiError(false);
-          for (size_t i = 0; i < chunk.prices.size(); ++i)
+          for (size_t i = 0; i < chunk.prices.size() && i < chunk.timestamps.size(); ++i)
           {
-            m_model.AddPrice(task.symbol, chunk.prices[i], chunk.timestamps[i]);
+            if (IsActive(task.symbol))
+              m_model.AddPrice(task.symbol, chunk.prices[i], chunk.timestamps[i]);
           }
           Logger::GetInstance().Log("[SYSTEM] Loaded " + std::to_string(chunk.prices.size()) + " historical points.");
         }
         else
         {
+          m_model.SetApiError(true);
           Logger::GetInstance().Log("[WARNING] History denied for " + task.symbol + ".");
         }
       }
